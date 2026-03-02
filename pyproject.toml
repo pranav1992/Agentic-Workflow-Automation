@@ -6,10 +6,12 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.128.8",
+    "fastmcp>=3.0.2",
     "livekit-agents[openai,silero,turn-detector]~=1.4",
     "livekit-api>=1.1.0",
     "livekit-plugins-noise-cancellation~=0.2",
     "python-dotenv>=1.2.1",
+    "sqlmodel>=0.0.37",
 ]
 
 [build-system]

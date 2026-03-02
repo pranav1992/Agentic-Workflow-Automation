@@ -14,10 +14,9 @@ load_dotenv()
 async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.SUBSCRIBE_ALL)
     await ctx.wait_for_participant()
-    # RealtimeModel is the class; the realtime module is not callable
     model = openai.realtime.RealtimeModel(
-        instructions="You are a helpful assistant.",
-        voice="shimmer",
+        model="gpt-realtime",
+        voice="marin",
         temperature=0.7,
         modalities=["audio", "text"],
     )
