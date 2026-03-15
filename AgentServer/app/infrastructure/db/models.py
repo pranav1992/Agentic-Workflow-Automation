@@ -60,56 +60,62 @@ class WorkFlow(SQLModel, table=True):  # Persistent Memory / history
         return data
 
 
-class Agent(SQLModel):
+class Agent(SQLModel, table=True):
+    __tablename__ = "agent"
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     name: str = Field(max_length=200, index=True)
     workflow_id: UUID = Field(foreign_key="workflow.id")
-    isInittial: Optional[bool] = Field(default=False)
+    isInitial: Optional[bool] = Field(default=False)
     model: str = Field(default="gpt-4")
     temperature: float = Field(default=0.5)
     instructions: str = Field(default="You are an AI assistant.")
     gaurdrails: str = Field(default="")
 
 
-class Tool(SQLModel):
+class Tool(SQLModel, table=True):
+    __tablename__ = "tool"
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     name: str = Field(max_length=200, index=True)
     Workflow_id: UUID = Field(foreign_key="workflow.id")
     method: str = Field(max_length=10)
-    payload: Dict[str, Any]
-
-
-class HandOff(SQLModel):
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    name: str = Field(max_length=200, index=True)
-    Workflow_id: UUID = Field(foreign_key="workflow.id")
-    metadata: Dict[str, Any] = Field(
+    payload: Dict[str, Any] = Field(
         default_factory=dict,
         sa_column=Column(JSONB, nullable=False),
-        description="Workflow graph payload from UI"
-        "(nodes, edges, metadata).",
+        description="Tool config / schema",
     )
 
 
-class Staging(SQLModel):
+class HandOff(SQLModel, table=True):
+    __tablename__ = "handoff"
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     name: str = Field(max_length=200, index=True)
     Workflow_id: UUID = Field(foreign_key="workflow.id")
-    metadata: Dict[str, Any] = Field(
+    meta: Dict[str, Any] = Field(
         default_factory=dict,
-        sa_column=Column(JSONB, nullable=False),
-        description="Workflow graph payload from UI"
-        "(nodes, edges, metadata).",
+        sa_column=Column("metadata", JSONB, nullable=False),
+        description="Workflow graph payload from UI (nodes, edges, metadata).",
     )
 
 
-class Graph(SQLModel):
+class Staging(SQLModel, table=True):
+    __tablename__ = "staging"
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     name: str = Field(max_length=200, index=True)
     Workflow_id: UUID = Field(foreign_key="workflow.id")
-    metadata: Dict[str, Any] = Field(
+    meta: Dict[str, Any] = Field(
         default_factory=dict,
-        sa_column=Column(JSONB, nullable=False),
-        description="Workflow graph payload from UI"
-        "(nodes, edges, metadata).",
+        sa_column=Column("metadata", JSONB, nullable=False),
+        description="Workflow graph payload from UI (nodes, edges, metadata).",
+    )
+
+
+class Graph(SQLModel, table=True):
+    __tablename__ = "graph"
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    name: str = Field(max_length=200, index=True)
+    Workflow_id: UUID = Field(foreign_key="workflow.id")
+    meta: Dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column("metadata", JSONB, nullable=False),
+        description="Workflow graph payload from UI (nodes, edges, metadata).",
     )

@@ -21,17 +21,23 @@ class WorkflowResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class AutoSaveCreateOrUpdate(BaseModel):
-    workflow_id: UUID
+class InititialAgent(BaseModel):
     name: str
-    description: Optional[str] = None
-    payload: Dict[str, Any]
+    workflow_id: UUID
+    isInitial: bool
 
 
-class AutoSaveRead(BaseModel):
+class AgentCreate(BaseModel):
+    name: str
+    workflow_id: UUID
+
+
+class Agentresponse(BaseModel):
     id: UUID
     name: str
-    description: Optional[str] = None
-    payload: Dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
+    workflow_id: UUID
+    isInitial: Optional[bool]
+    model: str
+    temperature: float
+    instructions: str
+    gaurdrails: str

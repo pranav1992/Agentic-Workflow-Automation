@@ -1,3 +1,4 @@
+from app.infrastructure.db.models import Agent
 
 
 class AgentRepository:
@@ -22,7 +23,8 @@ class AgentRepository:
         self.session.refresh(agent)
         return agent
 
-    def delete(self, agent):
+    def delete(self, agent_id):
+        agent = self.session.get(Agent, agent_id)
         self.session.delete(agent)
         self.session.commit()
         self.session.refresh(agent)

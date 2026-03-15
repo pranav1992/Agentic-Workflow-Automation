@@ -3,9 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from AgentServer.app.api.routers import workflows
+from app.api.routers import workflows
+from app.api.routers import agent
 from app.infrastructure.db.engine import create_db_and_tables
-from AgentServer.app.exception_handler import register_exception_handlers
+from app.exception_handler import register_exception_handlers
 
 
 @asynccontextmanager
@@ -34,6 +35,7 @@ app.add_middleware(
 )
 
 app.include_router(workflows.router)
+app.include_router(agent.router)
 
 register_exception_handlers(app)
 
