@@ -41,9 +41,9 @@ def get_workflow_by_name(name, workflow_service: WorkflowService = Depends(
 
 
 @router.delete("/delete/{id}", response_model=WorkflowResponse)
-def delete_workflow(id, workflow_service: WorkflowService = Depends(
-                                                    get_workflow_service)):
-    return workflow_service.delete_workflow(id)
+def delete_workflow(id, workflow_facade: WorkflowFacade = Depends(
+                                                    get_workflow_facade)):
+    return workflow_facade.delete_workflow(id)
 
 
 @router.put("/update/{id}", response_model=WorkflowResponse)

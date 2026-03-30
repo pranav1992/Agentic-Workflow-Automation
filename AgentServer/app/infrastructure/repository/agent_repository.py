@@ -72,10 +72,13 @@ class AgentRepository:
 
         return agent
 
-    def isNameAlreadyExist(self, name):
+    def isNameAlreadyExist(self, name, workflow_id):
+        """Return True if an agent with the same name exists in the workflow."""
         try:
             already_exist = self.session.exec(
-                select(Agent).where(Agent.name == name)
+                select(Agent).where(
+                    Agent.name == name, Agent.workflow_id == workflow_id
+                )
             ).first()
             return already_exist is not None
         except OperationalError:
@@ -89,6 +92,7 @@ class AgentRepository:
         stmt = (
             select(Agent)
             .where(Agent.workflow_id == workflow_id)
+            .options(selectinload(Agent.node_config))
             .options(selectinload(Agent.position_node))
         )
 

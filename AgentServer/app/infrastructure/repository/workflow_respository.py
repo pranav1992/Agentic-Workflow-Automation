@@ -60,8 +60,7 @@ class WorkflowRepository:
                 raise WorkflowNotFoundError(workflow_id)
 
             self.session.delete(workflow)
-            self.session.commit()
-            self.session.refresh(workflow)
+            # Do not commit here; caller (facade) controls the transaction
             return workflow
         except OperationalError:
             self.session.rollback()

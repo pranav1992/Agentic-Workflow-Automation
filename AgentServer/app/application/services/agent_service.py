@@ -14,7 +14,9 @@ class AgentService:
     def create(self, agent: AgentCreate):
         try:
             agent = Agent(**agent.model_dump())
-            exist = self.agent_repository.isNameAlreadyExist(agent.name)
+            exist = self.agent_repository.isNameAlreadyExist(
+                agent.name, agent.workflow_id
+            )
             if exist:
                 raise AgentNameAlreadyExist(agent.name)
         except Exception:
@@ -32,11 +34,12 @@ class AgentService:
 
         return self.agent_repository.delete(agent_id)
 
-    def initialize(self, workflow_id):
+    def initialize(self, workflow_id, position_id):
         try:
             payload = InititialAgent(
                 name="Start agent",
                 workflow_id=workflow_id,
+                position=position_id,
                 isInitial=True,
             )
             agent = Agent(**payload.model_dump())

@@ -1,264 +1,116 @@
-import CreateWorkflowDialog from "../components/createWorkflowDialog";
-
-import {
-  createWorkflow,
-  updateWorkflow,
-  getWorkflows,
-  deleteWorkflow,
-  getWorkflow,
-} from "../api/workflow";
 import { useState, useCallback, useEffect } from "react";
+import CreateWorkflowDialog from "../components/createWorkflowDialog";
+import { getWorkflows, deleteWorkflow } from "../api/workflow";
 import createWorkflowService from "../service/workflow_service";
-// Presentational list view for workflows. Expects handlers and data from parent.
+import { useNavigate } from "react-router";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
+// Lightweight workflows list + create flow
 function CreateWorkFlowPage() {
   const [showNewDialog, setShowNewDialog] = useState(false);
-  const [newNameInput, setNewNameInput] = useState("");
-  const [newDescInput, setNewDescInput] = useState("");
-  const [isLoadingList, setIsLoadingList] = useState(false);
-  const [workflowList, setWorkflowList] = useState([]);
-  const [workflowId, setWorkflowId] = useState("");
-  const [workflowName, setWorkflowName] = useState("My workflow");
-  const [workflowDescription, setWorkflowDescription] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [descInput, setDescInput] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const navigate = useNavigate();
 
-  const fetchWorkflowList = useCallback(async () => {
-    setIsLoadingList(true);
-    try {
-      console.log("fetchWorkflowList")
+  const queryClient = useQueryClient();
+  const {
+    data: workflows = [],
+    isFetching: isFetchingWorkflows,
+    isError: isErrorWorkflows,
+    error: errorWorkflows,
+  } = useQuery({
+    queryKey: ["workflows"],
+    queryFn: async () => {
       const data = await getWorkflows();
-      const list = Array.isArray(data)
+      return Array.isArray(data)
         ? data
         : Array.isArray(data?.data)
           ? data.data
           : [];
-      console.log(list)
-      setWorkflowList(list);
-    } catch (err) {
-      console.error(err);
+    },
+  });
+
+  const createWorkflowMutation = useMutation({
+    mutationFn: createWorkflowService,
+    onSuccess: (_, variables) => {
+      setStatusMessage(`Created workflow "${variables?.name}"`);
+      setShowNewDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+    },
+    onError: (err) => {
       setStatusMessage(
         err.response?.data?.detail ||
           err.message ||
-          "Failed to load workflows.",
+          "Failed to create workflow.",
       );
-    } finally {
-      setIsLoadingList(false);
-    }
-  }, []);
+    },
+  });
+
+
+  const workflowDeleteMutation = useMutation({
+    mutationFn: deleteWorkflow,
+    onSuccess: () => {
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+    },
+    onError: (err) => {
+      setStatusMessage(
+        err.response?.data?.detail || err.message || "Failed to delete.",
+      );
+    },
+  });
 
   useEffect(() => {
-    fetchWorkflowList();
-  }, [fetchWorkflowList]);
+    if (isErrorWorkflows && errorWorkflows) {
+      setStatusMessage(
+        errorWorkflows.response?.data?.detail ||
+          errorWorkflows.message ||
+          "Failed to load workflows.",
+      );
+    }
+  }, [errorWorkflows, isErrorWorkflows]);
 
+  const handleOpenWorkflow = useCallback(
+    (id) => {
+      navigate(`/workflows/${id}`);
+    },
+    [navigate],
+  );
 
-  // const loadWorkflowIntoCanvas = useCallback((payload) => {
-  //   if (!payload?.nodes) return;
-  //   // reconstruct agents and tools
-  //   const agentNodes = [];
-  //   const toolNodes = [];
-  //   const edgesFromTools = [];
-
-  //   payload.nodes.forEach((n) => {
-  //     const { tools = [], ...restData } = n.data || {};
-  //     agentNodes.push({
-  //       ...n,
-  //       data: {
-  //         ...restData,
-  //         type: "agent",
-  //       },
-  //     });
-  //     tools.forEach((t) => {
-  //       const toolId = t.id || crypto.randomUUID();
-  //       toolNodes.push({
-  //         id: toolId,
-  //         type: "tool",
-  //         position: { x: n.position?.x || 0, y: (n.position?.y || 0) + 150 },
-  //         data: t.data || {},
-  //       });
-  //       edgesFromTools.push({
-  //         id: `${toolId}-${n.id}`,
-  //         source: toolId,
-  //         target: n.id,
-  //         targetHandle: "tools",
-  //       });
-  //     });
-  //   });
-
-  //   const filteredEdges =
-  //     payload.edges?.filter(
-  //       (e) =>
-  //         agentNodes.find((a) => a.id === e.source) &&
-  //         agentNodes.find((a) => a.id === e.target),
-  //     ) || [];
-
-  //   setNodes([...agentNodes, ...toolNodes]);
-  //   setEdges([...filteredEdges, ...edgesFromTools]);
-  // }, []);
-
-  // const handleOpenWorkflow = useCallback(
-  //   async (id) => {
-  //     try {
-  //       const wf = await getWorkflow(id);
-  //       setWorkflowId(String(wf.id));
-  //       setWorkflowName(wf.name || "Untitled");
-  //       setWorkflowDescription(wf.payload?.meta?.description || "");
-  //       loadWorkflowIntoCanvas(wf.payload);
-  //       setView("builder");
-  //       setStatusMessage(`Opened workflow "${wf.name}"`);
-  //     } catch (err) {
-  //       console.error(err);
-  //       setStatusMessage(
-  //         err.response?.data?.detail ||
-  //           err.message ||
-  //           "Failed to open workflow.",
-  //       );
-  //     }
-  //   },
-  //   [loadWorkflowIntoCanvas],
-  // );
-
-  // const handleDeleteWorkflow = useCallback(
-  //   async (id) => {
-  //     if (!confirm("Delete this workflow permanently?")) return;
-  //     try {
-  //       await deleteWorkflow(id);
-  //       setStatusMessage("Workflow deleted.");
-  //       fetchWorkflowList();
-  //     } catch (err) {
-  //       console.error(err);
-  //       setStatusMessage(
-  //         err.response?.data?.detail || err.message || "Failed to delete.",
-  //       );
-  //     }
-  //   },
-  //   [fetchWorkflowList],
-  // );
-
-
-  // const saveNewWorkflow = useCallback(async () => {
-  //   const name = workflowName.trim();
-  //   if (!name) {
-  //     setStatusMessage("Please enter a workflow name before saving.");
-  //     return;
-  //   }
-  //   const taken = workflowList.some(
-  //     (wf) => wf.name?.toLowerCase() === name.toLowerCase(),
-  //   );
-  //   if (taken) {
-  //     setStatusMessage(
-  //       "Workflow name already exists. Choose a different name.",
-  //     );
-  //     return;
-  //   }
-  //   setIsSaving(true);
-  //   try {
-  //     const payload = serializeWorkflow();
-  //     const res = await createWorkflow({ name, payload });
-  //     setWorkflowId(res.id);
-  //     setStatusMessage(`Saved new workflow "${name}" (id: ${res.id}).`);
-  //     setView("list");
-  //     fetchWorkflowList();
-  //   } catch (err) {
-  //     console.error(err);
-  //     setStatusMessage(
-  //       err.response?.data?.detail || err.message || "Failed to save.",
-  //     );
-  //   } finally {
-  //     setIsSaving(false);
-  //   }
-  // }, [serializeWorkflow, workflowName]);
-
-  // const updateExistingWorkflow = useCallback(async () => {
-  //   const name = workflowName.trim();
-  //   if (!name) {
-  //     setStatusMessage("Please enter a workflow name before updating.");
-  //     return;
-  //   }
-  //   if (!workflowId) {
-  //     setStatusMessage("Provide a workflow ID to update.");
-  //     return;
-  //   }
-  //   const taken = workflowList.some(
-  //     (wf) =>
-  //       String(wf.id) !== String(workflowId) &&
-  //       wf.name?.toLowerCase() === name.toLowerCase(),
-  //   );
-  //   if (taken) {
-  //     setStatusMessage("Another workflow already uses this name.");
-  //     return;
-  //   }
-  //   setIsSaving(true);
-  //   try {
-  //     const payload = serializeWorkflow();
-  //     const res = await updateWorkflow(workflowId, { name, payload });
-  //     setStatusMessage(`Updated workflow "${res.name}" (id: ${res.id}).`);
-  //     setView("list");
-  //     fetchWorkflowList();
-  //   } catch (err) {
-  //     console.error(err);
-  //     setStatusMessage(
-  //       err.response?.data?.detail || err.message || "Failed to update.",
-  //     );
-  //   } finally {
-  //     setIsSaving(false);
-  //   }
-  // }, [serializeWorkflow, workflowId, workflowName]);
 
   const startNewWorkflow = useCallback(() => {
-    setNewNameInput("");
-    setNewDescInput("");
+    setNameInput("");
+    setDescInput("");
+    setStatusMessage("");
     setShowNewDialog(true);
   }, []);
 
-  // const confirmNewWorkflow = ()=>{showNewDialog(false)}
-
   const confirmNewWorkflow = useCallback(async () => {
-    const name = (newNameInput || "").trim();
+    const name = (nameInput || "").trim();
     if (!name) {
       setStatusMessage("Workflow name is required.");
       return;
     }
-    const taken = workflowList.some(
+    const taken = workflows.some(
       (wf) => wf.name?.toLowerCase() === name.toLowerCase(),
     );
     if (taken) {
       setStatusMessage("Workflow name already exists. Pick a different name.");
       return;
     }
-    console.log(name)
-    setStatusMessage("");
-    setWorkflowName(name);
-    let payload = {"name": name}
-    const data = await createWorkflowService(payload)
-    if (data.status == 200){
-      
-    }
 
-
-    // setWorkflowDescription(newDescInput.trim());
-    // setNodes([
-    //   {
-    //     id: initialAgentIdRef.current,
-    //     position: { x: 0, y: 0 },
-    //     type: "agent",
-    //     data: { ...DEFAULT_AGENT_DATA },
-    //   },
-    // ]);
-    // setEdges([]);
-    setWorkflowId("");
-    // setSidebarOpen(false);
-    // setView("builder");
-    setStatusMessage(`Started new workflow "${name}".`);
-    setShowNewDialog(false);
-  }, [newDescInput, newNameInput, workflowName]);
+    setStatusMessage("Creating workflow…");
+    createWorkflowMutation.mutate({ name, description: descInput.trim() });
+  }, [createWorkflowMutation, descInput, nameInput, workflows]);
 
   const renderNewDialog = () =>
     showNewDialog ? (
       <CreateWorkflowDialog
         setShowNewDialog={setShowNewDialog}
-        newNameInput={newNameInput}
-        setNewNameInput={setNewNameInput}
-        newDescInput={newDescInput}
-        setNewDescInput={setNewDescInput}
+        newNameInput={nameInput}
+        setNewNameInput={setNameInput}
+        newDescInput={descInput}
+        setNewDescInput={setDescInput}
         confirmNewWorkflow={confirmNewWorkflow}
       />
     ) : null;
@@ -275,9 +127,7 @@ function CreateWorkFlowPage() {
         >
           <h2 style={{ margin: 0 }}>Workflows</h2>
           <button
-            onClick={
-              ()=> startNewWorkflow()
-            }
+            onClick={() => startNewWorkflow()}
             style={{
               padding: "10px 14px",
               borderRadius: 8,
@@ -292,9 +142,14 @@ function CreateWorkFlowPage() {
         </div>
 
         <div style={{ marginTop: 16 }}>
-          {isLoadingList ? (
+          {statusMessage && (
+            <div style={{ marginBottom: 8, color: "#444" }}>
+              {statusMessage}
+            </div>
+          )}
+          {isFetchingWorkflows ? (
             <div>Loading workflows…</div>
-          ) : workflowList.length === 0 ? (
+          ) : workflows.length === 0 ? (
             <div>No workflows yet. Create one to get started.</div>
           ) : (
             <div
@@ -304,7 +159,7 @@ function CreateWorkFlowPage() {
                 gap: 12,
               }}
             >
-              {workflowList.map((wf) => (
+              {workflows.map((wf) => (
                 <div
                   key={wf.id}
                   style={{
@@ -321,9 +176,7 @@ function CreateWorkFlowPage() {
                   </div>
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                     <button
-                      onClick={() => {}
-                        // handleOpenWorkflow(wf.id)
-                      }
+                      onClick={() => handleOpenWorkflow(wf.id)}
                       style={{
                         flex: 1,
                         padding: "8px 10px",
@@ -336,9 +189,10 @@ function CreateWorkFlowPage() {
                       Open
                     </button>
                     <button
-                      onClick={() =>{}
-                        //  handleDeleteWorkflow(wf.id)
-                        }
+                      onClick={() => {
+                        if (!confirm("Delete this workflow permanently?")) return;
+                        workflowDeleteMutation.mutate(wf.id)
+                      }}
                       style={{
                         padding: "8px 10px",
                         borderRadius: 6,

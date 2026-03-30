@@ -19,26 +19,37 @@ class WorkflowResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class InititialAgent(BaseModel):
-    name: str
-    workflow_id: UUID
-    isInitial: bool
-
-
 class NodeConfigCreate(BaseModel):
     type: NodeType
-    Workflow_id: UUID
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    workflow_id: UUID
+    agent_id: UUID | None = None
+    tool_id: UUID | None = None
+    config: Dict[str, Any] = Field(
+        default_factory=dict,
+        alias="metadata",
+        serialization_alias="metadata",
+        validation_alias="config",
+    )
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class NodeConfigResponse(BaseModel):
     id: UUID
     type: NodeType
-    Workflow_id: UUID
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, validation_alias="data"
+    workflow_id: UUID
+    config: Dict[str, Any] = Field(
+        default_factory=dict,
+        alias="metadata",
+        serialization_alias="metadata",
+        validation_alias="config",
     )
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class InititialAgent(BaseModel):
+    name: str
+    workflow_id: UUID
+    isInitial: bool
 
 
 class AgentCreate(BaseModel):
@@ -62,13 +73,19 @@ class Agentresponse(BaseModel):
     gaurdrails: str
 
 
-class PositionResponse(BaseModel):
-    id: UUID
-    name: str
-    Workflow_id: UUID
+class PositionCreate(BaseModel):
+    workflow_id: UUID
     x: float
     y: float
-    model_config = ConfigDict(from_attributes=True)
+    agent_id: UUID | None = None
+    tool_id: UUID | None = None
+
+
+class PositionResponse(BaseModel):
+    id: UUID
+    workflow_id: UUID
+    x: float
+    y: float
 
 
 class AgentWithPositionResponse(BaseModel):
@@ -76,10 +93,13 @@ class AgentWithPositionResponse(BaseModel):
     name: str
     workflow_id: UUID
     isInitial: Optional[bool] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+
     # read from ORM attribute `position_node` but serialize as `position`
     position: Optional[PositionResponse] = Field(
         default=None, validation_alias="position_node"
+    )
+    config: Optional[NodeConfigResponse] = Field(
+        default=None, validation_alias="node_config"
     )
     model_config = ConfigDict(
         from_attributes=True,
@@ -87,4 +107,3 @@ class AgentWithPositionResponse(BaseModel):
         alias_generator=None,
         json_encoders={UUID: str},
     )
-    
