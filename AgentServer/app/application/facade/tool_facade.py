@@ -9,6 +9,7 @@ from app.infrastructure.repository.position_repository import \
     PositionRepository
 from app.domain.schema import ToolPayload
 from app.domain.schema import PositionCreate
+from app.infrastructure.db.models import Tool
 
 
 class ToolFacade:
@@ -19,7 +20,8 @@ class ToolFacade:
         self.session = session
 
     def create_tool(self, tool_data: ToolPayload):
-        tool = self.tool_service.create(tool_data.tool)
+        # persist Tool row
+        tool = self.tool_service.create(Tool(**tool_data.tool.model_dump()))
 
         config = tool_data.tool_config
         config.tool_id = tool.id  # ensure constraint satisfied
