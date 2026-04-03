@@ -138,13 +138,21 @@ function FlowCanvas() {
   const createToolMutation = useMutation({
     mutationFn: (payload) => createTool(payload),
     onSuccess: (tool) => {
+      const toolId =
+        tool?.id ?? tool?.tool?.id ?? tool?.data?.id;
+      const agentId =
+        tool?.agent_id ?? tool?.agentId ?? tool?.agent?.id;
+      if (!toolId || !agentId) {
+        setStatusMessage("Tool creation returned missing ids; edge not added.");
+        return;
+      }
       const positionId =
         tool?.position_node?.id ||
         tool?.position ||
         tool?.position_id ||
         tool?.positionId;
       const toolNode = {
-        id: String(tool.id),
+        id: String(toolId),
         type: "tool",
         position: {
           x: tool?.position_node?.x ?? tool?.x ?? 0,
@@ -152,8 +160,8 @@ function FlowCanvas() {
         },
         data: {
           ...DEFAULT_TOOL_DATA,
-          label: tool?.name || DEFAULT_TOOL_DATA.label,
-          method: tool?.method || DEFAULT_TOOL_DATA.method,
+          label: tool?.name || tool?.tool?.name || DEFAULT_TOOL_DATA.label,
+          method: tool?.method || tool?.tool?.method || DEFAULT_TOOL_DATA.method,
           positionId,
         },
       };
@@ -161,9 +169,9 @@ function FlowCanvas() {
       setEdges((eds) => [
         ...eds,
         {
-          id: `${toolNode.id}-${tool.agent_id}`,
+          id: `${toolNode.id}-${agentId}`,
           source: toolNode.id,
-          target: String(tool.agent_id),
+          target: String(agentId),
           targetHandle: "tools",
         },
       ]);
