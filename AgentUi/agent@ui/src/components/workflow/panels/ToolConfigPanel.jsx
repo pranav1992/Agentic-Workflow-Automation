@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import DangerButton from "../ui/DangerButton";
-import LabeledInput from "../ui/LabeledInput";
-import LabeledTextarea from "../ui/LabeledTextarea";
+import DangerButton from "../../../ui/DangerButton";
+import LabeledInput from "../../../ui/LabeledInput";
+import LabeledTextarea from "../../../ui/LabeledTextarea";
 
 export default function ToolConfigPanel({
   tool,

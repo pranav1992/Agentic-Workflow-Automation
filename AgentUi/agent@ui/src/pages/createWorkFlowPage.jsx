@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
-import CreateWorkflowDialog from "../components/createWorkflowDialog";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { CreateWorkflowDialog } from "../components/workflow";
 import { getWorkflows, deleteWorkflow } from "../api/workflow";
 import createWorkflowService from "../service/workflow_service";
 import { useNavigate } from "react-router";
@@ -11,6 +11,8 @@ function CreateWorkFlowPage() {
   const [descInput, setDescInput] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const navigate = useNavigate();
+  const loadingStartRef = useRef(0);
+  const [showLoading, setShowLoading] = useState(false);
 
   const queryClient = useQueryClient();
   const {
@@ -45,6 +47,22 @@ function CreateWorkFlowPage() {
     }, 5000);
     return () => clearTimeout(timer);
   }, [isFetchingWorkflows]);
+
+  useEffect(() => {
+    if (isFetchingWorkflows) {
+      loadingStartRef.current = Date.now();
+      setShowLoading(true);
+      return undefined;
+    }
+
+    if (!showLoading) return undefined;
+    const elapsed = Date.now() - loadingStartRef.current;
+    const remaining = Math.max(3000 - elapsed, 0);
+    const timer = setTimeout(() => {
+      setShowLoading(false);
+    }, remaining);
+    return () => clearTimeout(timer);
+  }, [isFetchingWorkflows, showLoading]);
 
   const createWorkflowMutation = useMutation({
     mutationFn: createWorkflowService,
@@ -133,6 +151,82 @@ function CreateWorkFlowPage() {
 
   return (
     <>
+      <style>{`
+        .wf-loading {
+          display: grid;
+          gap: 16px;
+          justify-items: center;
+          padding: 24px 8px;
+        }
+        .wf-spinner {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          border: 3px solid rgba(0, 0, 0, 0.1);
+          border-top-color: #111;
+          animation: wf-spin 0.9s linear infinite;
+        }
+        .wf-loading-text {
+          font-size: 14px;
+          letter-spacing: 0.2px;
+          color: #444;
+        }
+        .wf-skeleton-grid {
+          width: 100%;
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 12px;
+        }
+        .wf-skeleton-card {
+          border-radius: 12px;
+          padding: 14px;
+          background: #f7f7f7;
+          box-shadow: inset 0 0 0 1px #ededed;
+          position: relative;
+          overflow: hidden;
+        }
+        .wf-skeleton-card::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          transform: translateX(-100%);
+          background: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.6) 50%,
+            rgba(255, 255, 255, 0) 100%
+          );
+          animation: wf-shimmer 1.4s ease-in-out infinite;
+        }
+        .wf-skeleton-line {
+          height: 12px;
+          border-radius: 8px;
+          background: #e9e9e9;
+          margin-bottom: 10px;
+        }
+        .wf-skeleton-line.short {
+          width: 55%;
+        }
+        .wf-skeleton-line.tiny {
+          width: 35%;
+        }
+        .wf-skeleton-actions {
+          display: grid;
+          grid-template-columns: 1fr 80px;
+          gap: 8px;
+        }
+        .wf-skeleton-pill {
+          height: 30px;
+          border-radius: 8px;
+          background: #e2e2e2;
+        }
+        @keyframes wf-spin {
+          to { transform: rotate(360deg); }
+        }
+        @keyframes wf-shimmer {
+          to { transform: translateX(100%); }
+        }
+      `}</style>
       <div style={{ padding: 24 }}>
         <div
           style={{
@@ -163,8 +257,26 @@ function CreateWorkFlowPage() {
               {statusMessage}
             </div>
           )}
-          {isFetchingWorkflows ? (
-            <div>Loading workflows…</div>
+          {showLoading ? (
+            <div className="wf-loading">
+              <div className="wf-spinner" />
+              <div className="wf-loading-text">
+                Loading workflows…
+              </div>
+              <div className="wf-skeleton-grid">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div className="wf-skeleton-card" key={`wf-skel-${index}`}>
+                    <div className="wf-skeleton-line short" />
+                    <div className="wf-skeleton-line tiny" />
+                    <div className="wf-skeleton-line" />
+                    <div className="wf-skeleton-actions">
+                      <div className="wf-skeleton-pill" />
+                      <div className="wf-skeleton-pill" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : workflows.length === 0 ? (
             <div>No workflows yet. Create one to get started.</div>
           ) : (
