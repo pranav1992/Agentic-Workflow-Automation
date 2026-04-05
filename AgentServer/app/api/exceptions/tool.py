@@ -31,6 +31,6 @@ def tool_exception_handler(app):
     async def tool_not_found_handler(request: Request, exc: ToolNotFoundError):
         return JSONResponse(
             status_code=404,
-            content={"detail": exc.message, "agent_id": getattr(
-                                            exc, "agent_id", None)},
+            content={"detail": exc.message, "tool_id": getattr(
+                                            exc, "tool_id", None)},
         )

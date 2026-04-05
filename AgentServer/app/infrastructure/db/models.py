@@ -36,6 +36,10 @@ class WorkFlow(SQLModel, table=True):  # Persistent Memory / history
         back_populates="workflow",
         sa_relationship_kwargs={"lazy": "select"}
     )
+    edges: list["Edge"] = Relationship(
+        back_populates="workflow",
+        sa_relationship_kwargs={"lazy": "select", "passive_deletes": True},
+    )
 
     def __init__(self, **data):
         # ensure the canonical lower-case name is always populated
@@ -181,6 +185,22 @@ class Tool(SQLModel, table=True):
             "primaryjoin": "PositionNode.tool_id==Tool.id",
             "foreign_keys": "[PositionNode.tool_id]",
         },
+    )
+
+
+class Edge(SQLModel, table=True):
+    __tablename__ = "edge"
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    source: UUID = Field(foreign_key="positionnode.id")
+    target: UUID = Field(foreign_key="positionnode.id")
+    workflow_id: UUID = Field(
+        sa_column=Column(ForeignKey("workflow.id", ondelete="CASCADE"))
+    )
+    workflow: WorkFlow = Relationship(back_populates="edges")
+    data: Optional[Dict[str, Any]] = Field(
+        default=None,
+        sa_column=Column("metadata", JSONB, nullable=True),
+        description="Workflow graph payload from UI (nodes, edges, metadata).",
     )
 
 

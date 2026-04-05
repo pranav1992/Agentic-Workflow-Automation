@@ -17,6 +17,7 @@ from .tool import (
     ToolNotFoundError,
     InvalidToolDataError,
 )
+from .edge import InvalidEdgeDataError, EdgeNotFoundError
 from .system import DatabaseUnavailableError, SystemConfigurationError
 
 __all__ = [
@@ -33,5 +34,7 @@ __all__ = [
     "ToolNameAlreadyExist",
     "ToolNotFoundError",
     "InvalidToolDataError",
+    "InvalidEdgeDataError",
+    "EdgeNotFoundError",
 
 ]

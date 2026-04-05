@@ -48,6 +48,7 @@ class InititialAgent(BaseModel):
     name: str
     workflow_id: UUID
     isInitial: bool
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class AgentCreate(BaseModel):
@@ -58,6 +59,7 @@ class AgentCreate(BaseModel):
 class AgentPayload(BaseModel):
     agent: AgentCreate
     agent_config: NodeConfigCreate
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class Agentresponse(BaseModel):
@@ -69,6 +71,7 @@ class Agentresponse(BaseModel):
     temperature: float
     instructions: str
     gaurdrails: str
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PositionCreate(BaseModel):
@@ -88,6 +91,7 @@ class PositionResponse(BaseModel):
     workflow_id: UUID
     x: float
     y: float
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AgentWithPositionResponse(BaseModel):
@@ -148,3 +152,26 @@ class ToolWithPositionResponse(BaseModel):
 class CombinedNodesResponse(BaseModel):
     agents: list[AgentWithPositionResponse]
     tools: list[ToolWithPositionResponse]
+
+
+class EdgeCreate(BaseModel):
+    id: Optional[UUID] = None
+    source: UUID
+    target: UUID
+    workflow_id: UUID
+    data: Optional[Dict[str, Any]] = None
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+
+class EdgeResponse(BaseModel):
+    id: UUID
+    source: UUID
+    target: UUID
+    workflow_id: UUID
+    data: Optional[Dict[str, Any]] = None
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        alias_generator=None,
+        json_encoders={UUID: str},
+    )

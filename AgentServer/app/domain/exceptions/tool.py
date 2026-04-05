@@ -9,7 +9,7 @@ class InvalidToolDataError(DomainError):
 
 
 class ToolNameAlreadyExist(DomainError):
-    code = "AGENT_NAME_EXISTS"
+    code = "TOOL_NAME_EXISTS"
 
     def __init__(self, name: str):
         self.name = name

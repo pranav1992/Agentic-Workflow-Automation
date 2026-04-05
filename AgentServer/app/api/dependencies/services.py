@@ -10,6 +10,12 @@ from app.application.services.workflow_service import WorkflowService
 from app.application.facade.workflow_facade import WorkflowFacade
 from app.application.facade.agent_facade import AgentFacade
 from app.application.facade.tool_facade import ToolFacade
+from app.application.services.edge_service import EdgeService
+from app.infrastructure.repository.edge import EdgeRepository
+from app.application.services.position_service import PositionService
+from app.infrastructure.repository.position_repository import PositionRepository
+from app.application.services.tool_service import ToolService
+from app.infrastructure.repository.tool_repository import ToolRepository
 
 
 def get_agent_service(
@@ -46,3 +52,24 @@ def get_tool_facade(
     session: Session = Depends(get_session)
 ) -> ToolFacade:
     return ToolFacade(session)
+
+
+def get_edge_service(
+    session: Session = Depends(get_session)
+) -> EdgeService:
+    repo = EdgeRepository(session)
+    return EdgeService(repo)
+
+
+def get_position_service(
+    session: Session = Depends(get_session)
+) -> PositionService:
+    repo = PositionRepository(session)
+    return PositionService(repo)
+
+
+def get_tool_service(
+    session: Session = Depends(get_session)
+) -> ToolService:
+    repo = ToolRepository(session)
+    return ToolService(repo)

@@ -6,9 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routers import workflows
 from app.api.routers import agent
 from app.api.routers import tool
+from app.api.routers import edge
 from app.infrastructure.db.engine import create_db_and_tables
 from app.api.exceptions.base_exception_handler import base_exception_handler
 from app.api.routers import position
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,6 +41,7 @@ app.include_router(workflows.router)
 app.include_router(agent.router)
 app.include_router(tool.router)
 app.include_router(position.router)
+app.include_router(edge.router)
 
 base_exception_handler(app)
 

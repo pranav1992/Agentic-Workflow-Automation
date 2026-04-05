@@ -9,7 +9,7 @@ from app.domain.exceptions import (
     AgentNotFoundError,
     DatabaseUnavailableError,
 )
-from app.infrastructure.db.models import Agent
+from app.infrastructure.db.models import Agent, Edge
 
 
 class AgentRepository:
@@ -109,6 +109,16 @@ class AgentRepository:
             agent = self.session.get(Agent, agent_id)
             if agent is None:
                 raise AgentNotFoundError(agent_id)
+
+            position_id = agent.position
+
+            # remove edges that reference this agent's position node
+            if position_id:
+                (
+                    self.session.query(Edge)
+                    .filter((Edge.source == position_id) | (Edge.target == position_id))
+                    .delete(synchronize_session=False)
+                )
 
             # clear FKs and delete linked config/position before deleting agent
             agent.config = None

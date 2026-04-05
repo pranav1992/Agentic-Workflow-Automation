@@ -46,13 +46,10 @@ class AgentFacade:
         return agent
 
     def update_agent(self, agent_data: AgentPayload):
-        agent = self.agent_service.update(agent_data.agent)
-
-        # keep payload field name consistent with schema
+        # update config first so FK remains valid
         config = agent_data.agent_config
         self.node_config_service.update(config)
-
-        return self.agent_service.update(agent)
+        return self.agent_service.update(agent_data.agent)
 
     def get_agent(self, agent_id):
         return self.agent_service.get_agent(agent_id)

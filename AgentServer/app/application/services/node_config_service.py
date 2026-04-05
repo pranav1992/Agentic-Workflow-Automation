@@ -13,10 +13,11 @@ class NodeConfigService:
         return self.node_config_repo.create(data)
 
     def update(self, node_config):
-        pass
+        data = NodeConfig(**node_config.model_dump())
+        return self.node_config_repo.update(data)
 
     def get(self, node_config_id):
-        pass
+        return self.node_config_repo.get_node_config(node_config_id)
 
     def delete(self, node_config_id):
-        pass
+        return self.node_config_repo.delete(node_config_id)

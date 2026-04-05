@@ -66,15 +66,18 @@ export default function AgentNode({ id, data }) {
         style={{ left: 60, background: "#555" }}
       />
 
-      {/* INPUT HANDLE FOR AGENT-TO-AGENT LINKS (hidden on initial node) */}
-      {!data.isInitial && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          id="prev"
-          style={{ top: 40, background: "#555" }}
-        />
-      )}
+      {/* INPUT HANDLE FOR AGENT-TO-AGENT LINKS (always render to satisfy edges) */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="prev"
+        style={{
+          top: 40,
+          background: "#555",
+          opacity: data.isInitial ? 0.35 : 1,
+          pointerEvents: data.isInitial ? "none" : "auto",
+        }}
+      />
 
       {/* OUTPUT HANDLE */}
       <Handle

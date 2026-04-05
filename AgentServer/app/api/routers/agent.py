@@ -20,9 +20,9 @@ def create_agent(agent: AgentPayload, agent_facade: AgentFacade = Depends(
 
 
 @router.put("/", response_model=AgentWithPositionResponse)
-def update_agent(agent: AgentPayload, agent_service: AgentService = Depends(
-                                                    get_agent_service)):
-    return agent_service.update(agent)
+def update_agent(agent: AgentPayload, agent_facade: AgentFacade = Depends(
+                                                    get_agent_facade)):
+    return agent_facade.update_agent(agent)
 
 
 @router.delete("/{id}", response_model=AgentWithPositionResponse)

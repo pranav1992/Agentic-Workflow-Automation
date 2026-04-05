@@ -2,7 +2,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import joinedload, selectinload
 from app.domain.exceptions import ToolNameAlreadyExist, \
                                 DatabaseUnavailableError, ToolNotFoundError
-from app.infrastructure.db.models import Tool
+from app.infrastructure.db.models import Tool, Edge
 from sqlmodel import select
 
 
@@ -60,6 +60,16 @@ class ToolRepository:
             tool = self.session.get(Tool, tool_id)
             if tool is None:
                 raise ToolNotFoundError(tool_id)
+
+            position_id = tool.position
+
+            # remove edges that reference this tool's position node
+            if position_id:
+                (
+                    self.session.query(Edge)
+                    .filter((Edge.source == position_id) | (Edge.target == position_id))
+                    .delete(synchronize_session=False)
+                )
 
             # clear foreign keys on tool before deleting 
             # linked rows to satisfy constraints

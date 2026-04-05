@@ -20,7 +20,12 @@ import { getWorkflow, get_all_nodes } from "../api/workflow";
 import { createAgent, deleteAgentApi } from "../api/agent";
 import { createTool, deleteTool as deleteToolApi } from "../api/tool";
 import { updatePosition, updatePositionsBulk } from "../api/position";
-
+import {
+  createEdge,
+  deleteEdge as deleteEdgeApi,
+  get_all_edges,
+  updateEdge,
+} from "../api/edge";
 import AgentNode from "../components/AgentNode";
 import ToolNode from "../components/ToolNode";
 
@@ -45,6 +50,7 @@ function FlowCanvas() {
   const [statusMessage, setStatusMessage] = useState("");
   const [workflowList, setWorkflowList] = useState([]);
   const initialAgentIdRef = React.useRef(null);
+  const didFitRef = React.useRef(false);
 
   const nodeTypes = { agent: AgentNode, tool: ToolNode };
   const selectedTool = nodes.find((n) => n.id === selectedToolId);
@@ -82,6 +88,16 @@ function FlowCanvas() {
     },
   });
 
+  const { data: fetchedEdges } = useQuery({
+    queryKey: ["edges", workflowId],
+    enabled: Boolean(workflowId),
+    queryFn: async () => {
+      const data = await get_all_edges(workflowId);
+      return Array.isArray(data) ? data : [];
+    },
+  });
+
+
   const reactFlow = useReactFlow();
 
   const createAgentMutation = useMutation({
@@ -102,6 +118,14 @@ function FlowCanvas() {
     },
     onSuccess: (agent, variables) => {
       const newNode = agentSerializer(agent);
+      // plan a fallback position when API returns origin (0,0)
+      const agentNodes = nodes.filter((n) => n.type === "agent");
+      const totalAgents = agentNodes.length;
+      // stagger horizontally with modest vertical drift
+      const defaultSpread = {
+        x: 180 + totalAgents * 220,
+        y: 180 + (totalAgents % 4) * 80,
+      };
       // place new agent to the right of the source agent if provided
       if (variables?.sourceId) {
         const source = nodes.find((n) => n.id === variables.sourceId);
@@ -111,6 +135,11 @@ function FlowCanvas() {
             y: source.position?.y ?? 0,
           };
         }
+      } else if (
+        Number(newNode.position?.x ?? 0) === 0 &&
+        Number(newNode.position?.y ?? 0) === 0
+      ) {
+        newNode.position = defaultSpread;
       }
       setNodes((nds) => [...nds, newNode]);
 
@@ -125,7 +154,30 @@ function FlowCanvas() {
           data: { ...DEFAULT_HANDOFF_DATA },
         };
         setEdges((eds) => [...eds, newEdge]);
+        // persist the new edge if positions are available
+        const sourcePosId =
+          source?.data?.positionId ?? getPositionId(variables.sourceId);
+        const targetPosId = newNode?.data?.positionId;
+        if (sourcePosId && targetPosId) {
+          createEdgeMutation.mutate({
+            source: sourcePosId,
+            target: targetPosId,
+            workflow_id: workflowId,
+            data: newEdge.data,
+            tempId: newEdge.id,
+          });
+        } else {
+          setStatusMessage(
+            "Edge not persisted: missing positions for new agent link.",
+          );
+        }
       }
+      // persist position if available
+      persistNodePosition({
+        ...newNode,
+        type: "agent",
+        data: { ...newNode.data },
+      });
       setStatusMessage("Agent created");
     },
     onError: (err) => {
@@ -175,20 +227,110 @@ function FlowCanvas() {
       });
 
       setNodes((nds) => [...nds, toolNode]);
-      setEdges((eds) => [
-        ...eds,
-        {
-          id: `${toolNode.id}-${agentId}`,
-          source: toolNode.id,
-          target: String(agentId),
-          targetHandle: "tools",
-        },
-      ]);
+      const tempEdgeId = `${toolNode.id}-${agentId}`;
+      const edgeForUi = {
+        id: tempEdgeId,
+        source: toolNode.id,
+        target: String(agentId),
+        targetHandle: "tools",
+      };
+      setEdges((eds) => [...eds, edgeForUi]);
+
+      // persist tool->agent edge if we have both position ids
+      const sourcePosId = toolNode?.data?.positionId;
+      const targetPosId = agent?.data?.positionId ?? agent?.position?.id;
+      if (sourcePosId && targetPosId && workflowId) {
+        createEdge({
+          source: sourcePosId,
+          target: targetPosId,
+          workflow_id: workflowId,
+          data: {},
+        })
+          .then((saved) => {
+            setEdges((eds) =>
+              eds.map((e) =>
+                e.id === tempEdgeId
+                  ? {
+                      ...e,
+                      id: String(saved.id),
+                    }
+                  : e,
+              ),
+            );
+            queryClient.invalidateQueries({ queryKey: ["edges", workflowId] });
+          })
+          .catch((err) => {
+            const detail =
+              err?.response?.data?.detail ||
+              err.message ||
+              "Failed to persist tool edge";
+            setStatusMessage(detail);
+          });
+      } else {
+        setStatusMessage(
+          "Tool edge not persisted: missing position ids for tool or agent.",
+        );
+      }
       setStatusMessage("Tool created");
     },
     onError: (err) => {
       const detail =
         err?.response?.data?.detail || err.message || "Failed to create tool";
+      setStatusMessage(detail);
+    },
+  });
+
+
+  const createEdgeMutation = useMutation({
+    mutationFn: (payload) => createEdge(payload),
+    onSuccess: (edgeData, variables) => {
+      setEdges((eds) => {
+        // replace temp edge (if any) that matches source/target from variables.tempId
+        const mapped = eds.map((e) =>
+          e.id === variables?.tempId ? edgeSerializer(edgeData, nodes) ?? e : e,
+        );
+        const maybeEdge = edgeSerializer(edgeData, nodes);
+        if (maybeEdge && !mapped.find((e) => e.id === maybeEdge.id)) {
+          mapped.push(maybeEdge);
+        }
+        return mapped;
+      });
+      queryClient.invalidateQueries({ queryKey: ["edges", workflowId] });
+      setStatusMessage("Edge created");
+    },
+    onError: (err) => {
+      const detail =
+        err?.response?.data?.detail || err.message || "Failed to create edge";
+      setStatusMessage(detail);
+      // rollback any temp edge
+      setEdges((eds) => eds.filter((e) => !e.temp));
+    },
+  });
+
+  const updateEdgeMutation = useMutation({
+    mutationFn: (payload) => updateEdge(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["edges", workflowId] });
+    },
+    onError: (err) => {
+      const detail =
+        err?.response?.data?.detail || err.message || "Failed to update edge";
+      setStatusMessage(detail);
+    },
+  });
+
+  const deleteEdgeMutation = useMutation({
+    mutationFn: (edgeId) => deleteEdgeApi(edgeId),
+    onSuccess: (_data, edgeId) => {
+      setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+      setSelectedEdgeId(null);
+      setSidebarOpen(false);
+      setStatusMessage("Edge deleted");
+      queryClient.invalidateQueries({ queryKey: ["edges", workflowId] });
+    },
+    onError: (err) => {
+      const detail =
+        err?.response?.data?.detail || err.message || "Failed to delete edge";
       setStatusMessage(detail);
     },
   });
@@ -206,8 +348,8 @@ function FlowCanvas() {
     // react-query returns a new empty array on each render before data arrives
     // which previously retriggered this effect and caused a render loop.
     // Using the raw fetchedNodes reference stops the loop.
-    setNodes(fetchedNodes ?? []);
-        // ensure edges from tool->agent exist when loading from backend
+    setNodes(normalizePositions(fetchedNodes ?? []));
+    // ensure edges from tool->agent exist when loading from backend
     if (fetchedNodes?.length) {
       const toolNodes = fetchedNodes.filter((n) => n.type === "tool");
       const autoEdges = toolNodes
@@ -227,7 +369,48 @@ function FlowCanvas() {
         return merged;
       });
     }
+    didFitRef.current = false;
   }, [fetchedNodes]);
+
+
+    // load persisted agent-agent edges once nodes are available to map positions
+  useEffect(() => {
+    if (!fetchedEdges || !nodes.length) return;
+    const mapped = fetchedEdges
+      .map((e) => edgeSerializer(e, nodes))
+      .filter(Boolean);
+    setEdges((eds) => {
+      // preserve tool edges and replace agent-agent edges from server
+      const nonAgentEdges = eds.filter(
+        (e) => nodes.find((n) => n.id === e.source)?.type !== "agent",
+      );
+      const merged = [...nonAgentEdges, ...mapped];
+      const seen = new Set();
+      const deduped = [];
+      merged.forEach((edge) => {
+        if (!edge?.id) return;
+        if (seen.has(edge.id)) return;
+        seen.add(edge.id);
+        deduped.push(edge);
+      });
+      return deduped;
+    });
+  }, [fetchedEdges, nodes]);
+
+  // refit view after nodes load/update to keep new nodes in sight
+  useEffect(() => {
+    if (!fetchedNodes?.length) return;
+    const t = setTimeout(() => {
+      try {
+        reactFlow.fitView({ padding: 0.25 });
+      } catch (_err) {
+        /* ignore */
+      }
+    }, 80);
+    return () => clearTimeout(t);
+  }, [fetchedNodes, reactFlow]);
+
+
 
   // track the agent marked as initial so we can guard deletes
   useEffect(() => {
@@ -250,6 +433,7 @@ function FlowCanvas() {
   useEffect(() => {
     if (routeWorkflowId && routeWorkflowId !== workflowId) {
       setWorkflowId(routeWorkflowId);
+      didFitRef.current = false;
     }
   }, [routeWorkflowId, workflowId]);
 
@@ -298,8 +482,19 @@ function FlowCanvas() {
   // serialize server agent payload into React Flow node shape
   function agentSerializer(agentData) {
     const positionNode = agentData?.position || agentData?.position_node;
-    const x = positionNode?.x ?? 200;
-    const y = positionNode?.y ?? 200;
+    const serverAtOrigin =
+      positionNode &&
+      Number(positionNode.x ?? 0) === 0 &&
+      Number(positionNode.y ?? 0) === 0;
+    const safe = (v, fallback) => {
+      const num = Number(v);
+      if (!Number.isFinite(num)) return fallback;
+      // clamp extreme values that push nodes off-canvas
+      const clamped = Math.max(Math.min(num, 2000), -2000);
+      return clamped;
+    };
+    const x = serverAtOrigin ? 200 : safe(positionNode?.x, 200);
+    const y = serverAtOrigin ? 200 : safe(positionNode?.y, 200);
     const config = agentData?.node_config?.config ?? {};
     return {
       id: String(agentData.id),
@@ -324,6 +519,11 @@ function FlowCanvas() {
       toolData?.tool_config?.config ||
       toolData?.config ||
       {};
+    const safe = (v, fallback) => {
+      const num = Number(v);
+      if (!Number.isFinite(num)) return fallback;
+      return Math.max(Math.min(num, 2000), -2000);
+    };
     const resolvedAgentId =
       toolData?.agent_id ??
       toolData?.agentId ??
@@ -334,8 +534,6 @@ function FlowCanvas() {
     const fallbackX = agentForFallback?.position?.x ?? 0;
     const fallbackY = (agentForFallback?.position?.y ?? 0) + 180;
 
-    // use server position unless it is the default origin (0,0) which 
-    // makes the tool appear far away
     const hasServerPos =
       positionNode && (positionNode.x !== undefined || positionNode.y !== undefined);
     const serverAtOrigin =
@@ -345,11 +543,11 @@ function FlowCanvas() {
     const xPos =
       !hasServerPos || serverAtOrigin
         ? fallbackX
-        : positionNode.x ?? toolData?.x ?? fallbackX;
+        : safe(positionNode.x ?? toolData?.x, fallbackX);
     const yPos =
       !hasServerPos || serverAtOrigin
         ? fallbackY
-        : positionNode.y ?? toolData?.y ?? fallbackY;
+        : safe(positionNode.y ?? toolData?.y, fallbackY);
 
     return {
       id: String(toolData?.id ?? toolData?.tool?.id ?? toolData?.data?.id),
@@ -380,6 +578,63 @@ function FlowCanvas() {
       },
     };
   }
+
+  // ensure nodes have reasonable finite positions; recenters if spread is huge
+  function normalizePositions(nodesList) {
+    if (!Array.isArray(nodesList) || !nodesList.length) return nodesList ?? [];
+    const cleaned = nodesList.map((n) => {
+      const x = Number(n.position?.x ?? 0);
+      const y = Number(n.position?.y ?? 0);
+      const bad = !Number.isFinite(x) || !Number.isFinite(y);
+      const tooFar = Math.abs(x) > 2000 || Math.abs(y) > 2000;
+      if (bad || tooFar) {
+        return { ...n, position: { x: 200, y: 200 } };
+      }
+      return n;
+    });
+
+    const xs = cleaned.map((n) => n.position.x);
+    const ys = cleaned.map((n) => n.position.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    const span = Math.max(maxX - minX, maxY - minY);
+    const needsShift =
+      span > 2000 || Math.abs(minX) > 1500 || Math.abs(minY) > 1500;
+    if (!needsShift) return cleaned;
+
+    const shiftX = 200 - minX;
+    const shiftY = 200 - minY;
+    return cleaned.map((n) => ({
+      ...n,
+      position: {
+        x: n.position.x + shiftX,
+        y: n.position.y + shiftY,
+      },
+    }));
+  }
+
+   // translate backend edge (position ids) into React Flow edge (agent ids)
+  function edgeSerializer(edgeData, nodesList) {
+    const sourceNode = nodesList.find(
+      (n) => n.data?.positionId && n.data.positionId === edgeData.source,
+    );
+    const targetNode = nodesList.find(
+      (n) => n.data?.positionId && n.data.positionId === edgeData.target,
+    );
+    if (!sourceNode || !targetNode) return null;
+    const isToolToAgent =
+      sourceNode.type === "tool" && targetNode.type === "agent";
+    return {
+      id: String(edgeData.id),
+      source: String(sourceNode.id),
+      target: String(targetNode.id),
+      sourceHandle: isToolToAgent ? undefined : "next",
+      targetHandle: isToolToAgent ? "tools" : "prev",
+      data: edgeData.data ?? (isToolToAgent ? {} : { ...DEFAULT_HANDOFF_DATA }),
+    };
+  }
   
 
   const positionMutation = useMutation({
@@ -392,6 +647,33 @@ function FlowCanvas() {
       setStatusMessage(detail);
     },
   });
+
+
+  const getPositionId = useCallback(
+    (nodeId) => nodes.find((n) => n.id === nodeId)?.data?.positionId,
+    [nodes],
+  );
+
+  const buildEdgePayload = useCallback(
+    (edge, includeId = true) => {
+      const sourcePos = getPositionId(edge.source);
+      const targetPos = getPositionId(edge.target);
+      if (!sourcePos || !targetPos) {
+        throw new Error("Missing position for edge endpoints");
+      }
+      const payload = {
+        source: sourcePos,
+        target: targetPos,
+        workflow_id: workflowId,
+        data: edge.data ?? { ...DEFAULT_HANDOFF_DATA },
+      };
+      if (includeId && edge.id) {
+        payload.id = edge.id;
+      }
+      return payload;
+    },
+    [getPositionId, workflowId],
+  );
 
   const bulkPositionMutation = useMutation({
     mutationFn: (positions) => updatePositionsBulk(positions),
@@ -489,30 +771,55 @@ function FlowCanvas() {
   const onConnect = useCallback(
     (params) => {
       if (!isValidConnection(params)) return;
-      setEdges((eds) =>
-        addEdge(
-          {
-            ...params,
-            data: { ...DEFAULT_HANDOFF_DATA },
-          },
-          eds,
-        ),
-      );
+            const tempId = `temp-${Date.now()}`;
+      try {
+        const newEdge = {
+          id: tempId,
+          source: params.source,
+          target: params.target,
+          sourceHandle: "next",
+          targetHandle: "prev",
+          data: { ...DEFAULT_HANDOFF_DATA },
+          temp: true,
+        };
+        // optimistic UI
+        setEdges((eds) => addEdge(newEdge, eds));
+
+        const payload = buildEdgePayload(newEdge, false);
+        createEdgeMutation.mutate({ ...payload, tempId });
+      } catch (err) {
+        setStatusMessage(err.message);
+        setEdges((eds) => eds.filter((e) => e.id !== tempId));
+      }
     },
-    [isValidConnection],
+    [isValidConnection, buildEdgePayload, createEdgeMutation],
   );
 
-  const onReconnect = useCallback((oldEdge, newConnection) => {
-    if (!isValidConnection(newConnection)) return;
-    setEdges((eds) => {
-      const updated = reconnectEdge(oldEdge, newConnection, eds);
-      return updated.map((e) =>
-        e.id === oldEdge.id
-          ? { ...e, data: oldEdge.data ?? DEFAULT_HANDOFF_DATA }
-          : e,
-      );
-    });
-  }, []);
+const onReconnect = useCallback(
+    (oldEdge, newConnection) => {
+      if (!isValidConnection(newConnection)) return;
+      setEdges((eds) => {
+        const updated = reconnectEdge(oldEdge, newConnection, eds);
+        return updated.map((e) =>
+          e.id === oldEdge.id
+            ? { ...e, data: oldEdge.data ?? DEFAULT_HANDOFF_DATA }
+            : e,
+        );
+      });
+      try {
+        const payload = buildEdgePayload({
+          ...oldEdge,
+          source: newConnection.source,
+          target: newConnection.target,
+        });
+        updateEdgeMutation.mutate(payload);
+      } catch (err) {
+        setStatusMessage(err.message);
+      }
+    },
+    [isValidConnection, buildEdgePayload, updateEdgeMutation],
+  );
+
 
   const onNodeClick = useCallback(
     (_, node) => {
@@ -620,13 +927,26 @@ function FlowCanvas() {
         e.id === edgeId ? { ...e, data: { ...e.data, ...updates } } : e,
       ),
     );
-  }, []);
+       const edge = edges.find((e) => e.id === edgeId);
+    if (!edge) return;
+    try {
+      const payload = buildEdgePayload({
+        ...edge,
+        data: { ...edge.data, ...updates },
+      });
+      updateEdgeMutation.mutate(payload);
+    } catch (err) {
+      setStatusMessage(err.message);
+    }
+  },[edges, buildEdgePayload, updateEdgeMutation]);
 
-  const deleteEdge = useCallback((edgeId) => {
-    setEdges((eds) => eds.filter((e) => e.id !== edgeId));
-    setSelectedEdgeId(null);
-    setSidebarOpen(false);
-  }, []);
+
+ const handleDeleteEdge = useCallback(
+    (edgeId) => {
+      deleteEdgeMutation.mutate(edgeId);
+    },
+    [deleteEdgeMutation],
+  );
 
   const deleteAgent = useCallback((agentId) => {
     const node = nodes.find((n) => n.id === agentId);
@@ -778,7 +1098,7 @@ function FlowCanvas() {
               <HandoffPanel
                 edge={selectedEdge}
                 onChange={updateEdgeData}
-                onDelete={deleteEdge}
+                onDelete={handleDeleteEdge}
                 onSave={onSavePanel}
                 onClose={onCloseSidebar}
               />
