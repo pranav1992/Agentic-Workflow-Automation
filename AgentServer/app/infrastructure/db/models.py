@@ -50,6 +50,10 @@ class WorkFlow(SQLModel, table=True):  # Persistent Memory / history
         back_populates="workflow",
         sa_relationship_kwargs={"lazy": "select", "passive_deletes": True},
     )
+    sessions: list["WorkflowSession"] = Relationship(
+        back_populates="workflow",
+        sa_relationship_kwargs={"lazy": "select", "passive_deletes": True},
+    )
 
     def __init__(self, **data):
         # ensure the canonical lower-case name is always populated
@@ -241,3 +245,20 @@ class HandOff(SQLModel, table=True):
     )
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class WorkflowSession(SQLModel, table=True):
+    __tablename__ = "workflow_session"
+    __table_args__ = (
+        Index("idx_session_workflow", "workflow_id"),
+        Index("idx_session_status", "status"),
+    )
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    workflow_id: UUID = Field(
+        sa_column=Column(ForeignKey("workflow.id", ondelete="CASCADE"))
+    )
+    room_name: str = Field(max_length=200)
+    started_at: datetime = Field(default_factory=datetime.now)
+    ended_at: Optional[datetime] = Field(default=None)
+    status: str = Field(default="active", max_length=20)  # active | stopped
+    workflow: Optional[WorkFlow] = Relationship(back_populates="sessions")

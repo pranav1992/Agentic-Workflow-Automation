@@ -175,3 +175,38 @@ class EdgeResponse(BaseModel):
         alias_generator=None,
         json_encoders={UUID: str},
     )
+
+
+class WorkflowLaunchResponse(BaseModel):
+    session_id: UUID
+    room_name: str
+    token: str
+    livekit_url: str
+
+
+class WorkflowSessionResponse(BaseModel):
+    id: UUID
+    workflow_id: UUID
+    room_name: str
+    started_at: datetime
+    ended_at: Optional[datetime] = None
+    status: str
+    duration_seconds: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def from_orm_with_duration(cls, obj) -> "WorkflowSessionResponse":
+        instance = cls.model_validate(obj)
+        if obj.ended_at and obj.started_at:
+            instance.duration_seconds = int(
+                (obj.ended_at - obj.started_at).total_seconds()
+            )
+        return instance
+
+
+class WorkflowStatusResponse(BaseModel):
+    status: str  # "active" | "idle"
+    session_id: Optional[UUID] = None
+    room_name: Optional[str] = None
+    started_at: Optional[datetime] = None
