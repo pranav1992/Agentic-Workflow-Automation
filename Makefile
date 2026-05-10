@@ -5,7 +5,7 @@ BIN     := $(VENV)/bin
 
 .DEFAULT_GOAL := help
 .PHONY: help infra infra-down install install-api install-ui \
-        migrate migrate-new api ui \
+        migrate migrate-new api ui worker \
         lint test \
         docker-up docker-build docker-down logs logs-api
 
@@ -55,6 +55,9 @@ api: ## Start FastAPI with hot-reload on :8000
 
 ui: ## Start Vite dev server with HMR on :5173
 	cd $(UI_DIR) && npm run dev
+
+worker: ## Start LiveKit voice worker (requires LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET in .env.local)
+	cd $(API_DIR) && $(BIN)/python agents/workers/entrypoint.py dev
 
 # ── Quality ───────────────────────────────────────────────────
 lint: ## Lint API (ruff) and UI (eslint)

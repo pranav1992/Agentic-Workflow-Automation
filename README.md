@@ -15,6 +15,7 @@ A full-stack platform for building and deploying AI-powered voice agents for aut
 - [Data Model](#data-model)
 - [API Reference](#api-reference)
 - [Setup — Local Development](#setup--local-development)
+- [Launching a Workflow](#launching-a-workflow)
 - [Setup — Docker (all services)](#setup--docker-all-services)
 - [Environment Variables](#environment-variables)
 - [Component Details](#component-details)
@@ -168,8 +169,10 @@ WorkFlow
   │           └── NodeConfig    (1:1)
   ├── Edge   (many)
   │     id, source (positionnode.id), target (positionnode.id), workflow_id, metadata JSONB
-  └── HandOff (many)
-        id, name, workflow_id, metadata JSONB
+  ├── HandOff (many)
+  │     id, name, workflow_id, metadata JSONB
+  └── WorkflowSession (many)
+        id, workflow_id, room_name, started_at, ended_at, status (active|stopped)
 ```
 
 `NodeType` enum: `agent | tool`
@@ -198,6 +201,10 @@ Base URL: `http://localhost:8000`
 | DELETE | `/workflows/delete/{id}` | Delete workflow (cascades) |
 | GET | `/workflows/get_all_agent/{id}` | List agents with positions |
 | GET | `/workflows/get_all_nodes/{id}` | List all agents + tools with positions |
+| POST | `/workflows/{id}/launch` | Create LiveKit room, return token + URL |
+| POST | `/workflows/{id}/stop` | Delete LiveKit room, mark session stopped |
+| GET | `/workflows/{id}/status` | Active session info or `{"status":"idle"}` |
+| GET | `/workflows/{id}/sessions` | Session history (newest first) |
 
 ### Agents `/agents`
 | Method | Path | Description |
@@ -235,54 +242,95 @@ Interactive docs available at `http://localhost:8000/docs` (Swagger UI).
 
 ## Setup — Local Development
 
-### Quickstart (recommended)
+### Quickstart (Makefile — recommended)
+
+**Prerequisites:** Python 3.12+, Node.js 20+, Docker Desktop, [uv](https://github.com/astral-sh/uv)
 
 ```bash
 cp AgentServer/.env.local.example AgentServer/.env.local
-# Edit AgentServer/.env.local with your LiveKit + OpenAI credentials
-
-./start.sh        # starts all services
-./stop.sh         # stops all services
+# Fill in LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, OPENAI_API_KEY, POSTGRES_*, JWT_SECRET_KEY
 ```
 
-Individual targets:
+Open **four terminals**, one per process:
 
 ```bash
-./start.sh api      # backend only (also starts Postgres)
-./start.sh ui       # frontend only
-./start.sh worker   # LiveKit voice worker only
-./start.sh infra    # Postgres + Redis only
+# Terminal 1 — infrastructure (Postgres + Redis)
+make infra
+
+# Terminal 2 — install deps + apply migrations + start API
+make install-api
+make migrate
+make api
+
+# Terminal 3 — frontend dev server
+make install-ui
+make ui
+
+# Terminal 4 — LiveKit voice worker
+make worker
 ```
 
-### Manual setup
+Run `make help` to see all available targets.
 
-**Prerequisites:** Python 3.12+, Node.js 20+, Docker & Docker Compose
+### All Makefile targets
 
-```bash
-# 1. Infrastructure
-docker compose up -d postgres redis
+| Target | Description |
+|---|---|
+| `make infra` | Start Postgres + Redis in Docker |
+| `make infra-down` | Stop Postgres + Redis |
+| `make install` | Install all Python + JS dependencies |
+| `make migrate` | Apply pending Alembic migrations |
+| `make migrate-new MSG="…"` | Generate a new migration |
+| `make api` | Start FastAPI with hot-reload on :8000 |
+| `make ui` | Start Vite dev server on :5173 |
+| `make worker` | Start LiveKit voice worker |
+| `make lint` | Run ruff (Python) + eslint (JS) |
+| `make test` | Run Python test suite |
 
-# 2. Backend API
-cd AgentServer
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.local.example .env.local   # fill in credentials
-alembic upgrade head
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+---
+
+## Launching a Workflow
+
+Once the full stack is running, you can start a live voice session directly from the browser.
+
+### Steps
+
+1. **Open a workflow** in the builder (navigate to any workflow from the list page).
+2. Click the **▶ Launch** button in the top-right corner of the toolbar.
+3. **Allow microphone access** when the browser prompts.
+4. The voice panel appears at the bottom of the canvas — the agent speaks through your speakers and listens through your mic.
+5. Click **■ Stop** (or the Stop button in the panel) to end the session.
+
+### What happens under the hood
+
+```
+Browser → POST /workflows/{id}/launch
+        ← { room_name, token, livekit_url, session_id }
+Browser → Room.connect(livekit_url, token)    # livekit-client
+Worker  ← LiveKit dispatches new room job
+Worker  → loads workflow from Postgres, starts OpenAI Realtime session
 ```
 
-```bash
-# 3. Frontend UI
-cd AgentUi/agent@ui
-npm install && npm run dev
-```
+### Requirements
 
-```bash
-# 4. LiveKit Voice Worker
-cd AgentServer
-source .venv/bin/activate
-python agents/workers/entrypoint.py dev
-```
+- **LiveKit URL + credentials** must be set in `AgentServer/.env.local`:
+  ```
+  LIVEKIT_URL=wss://your-project.livekit.cloud
+  LIVEKIT_API_KEY=your-api-key
+  LIVEKIT_API_SECRET=your-api-secret
+  ```
+- **The voice worker must be running** (in a separate terminal):
+  ```bash
+  make worker
+  ```
+- A modern browser with microphone support (Chrome / Edge recommended).
+
+### Session History
+
+Each time a workflow is launched a `WorkflowSession` record is persisted. On the **Workflows list page**:
+
+- Each card shows a live status badge — **● Running** (green) or **○ Idle** (grey), polled every 10 seconds.
+- Click **History** on any card to open a side drawer listing all past sessions with start time, duration, and status.
 
 ---
 
