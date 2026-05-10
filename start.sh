@@ -6,7 +6,6 @@
 #   ./start.sh api      # backend API only
 #   ./start.sh ui       # frontend only
 #   ./start.sh worker   # LiveKit voice worker only
-#   ./start.sh mcp      # MCP server only
 #   ./start.sh infra    # Postgres + Redis only (via Docker)
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -123,19 +122,6 @@ start_worker() {
   info "LiveKit worker PID: $WORKER_PID (log: .logs/worker.log)"
 }
 
-# ── MCP Server ────────────────────────────────────────────────
-start_mcp() {
-  info "Starting FastMCP car data server..."
-  (
-    cd "$ROOT_DIR"
-    source AgentServer/.venv/bin/activate
-    exec python -m cars_mcp.server 2>&1 | tee "$LOG_DIR/mcp.log"
-  ) &
-  MCP_PID=$!
-  echo $MCP_PID > "$LOG_DIR/mcp.pid"
-  info "MCP server PID: $MCP_PID (log: .logs/mcp.log)"
-}
-
 # ── Cleanup on Ctrl-C ─────────────────────────────────────────
 cleanup() {
   echo ""
@@ -161,7 +147,6 @@ case "$TARGET" in
     start_api
     start_ui
     start_worker
-    start_mcp
     echo ""
     echo -e "${GREEN}═══════════════════════════════════════════${NC}"
     echo -e "${GREEN}  All services started successfully!${NC}"
@@ -179,9 +164,8 @@ case "$TARGET" in
   api)     start_infra && start_api    && wait ;;
   ui)      start_ui                    && wait ;;
   worker)  start_worker                && wait ;;
-  mcp)     start_mcp                   && wait ;;
   *)
-    echo "Usage: $0 [all|api|ui|worker|mcp|infra]"
+    echo "Usage: $0 [all|api|ui|worker|infra]"
     exit 1
     ;;
 esac

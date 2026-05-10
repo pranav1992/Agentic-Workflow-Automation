@@ -26,13 +26,12 @@ A full-stack platform for building and deploying AI-powered voice agents for aut
 
 ## Overview
 
-The system has three main concerns:
+The system has two main concerns:
 
 | Layer | What it does |
 |---|---|
-| **Voice runtime** | A LiveKit agent worker connects callers to an AI assistant, collects VIN, and routes them to the right department |
-| **Workflow builder** | Operators visually create directed graphs of agents and tools; the backend persists graph state (nodes, edges, configs) |
-| **Car data (MCP)** | A FastMCP server exposes SQLite-backed car lookup tools (VIN → make/model/year) that the agents can call |
+| **Voice runtime** | A LiveKit agent worker connects callers to an AI assistant and routes them to the right department based on the active workflow |
+| **Workflow builder** | Operators visually create directed graphs of agents and tools; the backend persists graph state (nodes, edges, configs) which the voice worker loads at runtime |
 
 ---
 
@@ -52,24 +51,18 @@ The system has three main concerns:
 │  Redis cache   ──►  Redis      (port 6379)               │
 └──────────────────────────────────────────────────────────┘
                          ▲
-                         │ LiveKit Agents SDK
+                         │ WorkflowLoader (reads DB at session start)
 ┌────────────────────────┴─────────────────────────────────┐
 │               LiveKit Worker (voice runtime)              │
+│  WorkflowLoader ──► RuntimeWorkflow (agents + edges)     │
 │  CarServiceAssistant  ──►  OpenAI Realtime API           │
-│                       ──►  MCP tools / FastAPI APIs      │
-└──────────────────────────────────────────────────────────┘
-                         ▲
-                         │ FastMCP (stdio / HTTP)
-┌────────────────────────┴─────────────────────────────────┐
-│                  cars_mcp  (MCP server)                  │
-│  greet(), VIN lookup …  ──►  SQLite car database         │
 └──────────────────────────────────────────────────────────┘
 ```
 
 Call flow:
-1. A customer calls the LiveKit room.
-2. The worker connects, greets the customer, and asks for their VIN.
-3. The agent looks up the VIN via MCP tools, then answers questions or routes the caller to the right department.
+1. A LiveKit room is created with metadata `{"workflow_id": "<uuid>"}`.
+2. The worker connects, loads the workflow graph from Postgres via `WorkflowLoader`.
+3. The `isInitial` agent's instructions, model, and temperature from the builder UI drive the session.
 4. Operators use the React UI to define which agents exist, what tools they have, and how they hand off to each other.
 
 ---
@@ -104,6 +97,9 @@ CarServiceVoiceAssistant/
 │   ├── agents/
 │   │   ├── agents/agent.py       # CarServiceAssistant (LiveKit Agent)
 │   │   ├── prompts/prompts.py    # System prompt + welcome message
+│   │   ├── runtime/              # Workflow → runtime bridge
+│   │   │   ├── workflow_loader.py  # Loads workflow graph from Postgres
+│   │   │   └── agent_factory.py    # Builds LiveKit Agent from DB config
 │   │   └── workers/entrypoint.py # LiveKit worker entry point
 │   ├── migrations/               # Alembic migration scripts
 │   ├── Dockerfile
@@ -122,10 +118,8 @@ CarServiceVoiceAssistant/
 │   ├── vite.config.js
 │   └── dockerfile
 │
-├── cars_mcp/                     # FastMCP server
-│   ├── server.py                 # MCP tool definitions
-│   └── db/                       # SQLModel engine + Car model
-│
+├── start.sh                      # Dev launcher (all services or individual)
+├── stop.sh                       # Stop all background services
 ├── docker-compose.yml            # Postgres + Redis + api + client
 └── main.py                       # Root placeholder
 ```
@@ -143,7 +137,7 @@ CarServiceVoiceAssistant/
 | Migrations | Alembic |
 | Caching | Redis 7 |
 | Voice runtime | LiveKit Agents SDK 1.4 |
-| LLM | OpenAI Realtime API (`gpt-realtime`, voice `marin`) |
+| LLM | OpenAI Realtime API (`gpt-4o-realtime-preview`, voice `marin`) |
 | Settings | Pydantic Settings |
 | Server | Uvicorn |
 | Python | 3.12+ |
@@ -156,13 +150,6 @@ CarServiceVoiceAssistant/
 | Server state | TanStack Query 5 |
 | Routing | React Router 7 |
 | HTTP client | Axios |
-| Build | Vite |
-
-### MCP Server (cars_mcp)
-| Concern | Library |
-|---|---|
-| MCP framework | FastMCP |
-| Database | SQLite via SQLModel |
 
 ---
 
@@ -248,73 +235,53 @@ Interactive docs available at `http://localhost:8000/docs` (Swagger UI).
 
 ## Setup — Local Development
 
-### Prerequisites
-- Python 3.12+
-- Node.js 20+
-- Docker & Docker Compose (for Postgres + Redis)
-
-### 1. Start infrastructure services
+### Quickstart (recommended)
 
 ```bash
+cp AgentServer/.env.local.example AgentServer/.env.local
+# Edit AgentServer/.env.local with your LiveKit + OpenAI credentials
+
+./start.sh        # starts all services
+./stop.sh         # stops all services
+```
+
+Individual targets:
+
+```bash
+./start.sh api      # backend only (also starts Postgres)
+./start.sh ui       # frontend only
+./start.sh worker   # LiveKit voice worker only
+./start.sh infra    # Postgres + Redis only
+```
+
+### Manual setup
+
+**Prerequisites:** Python 3.12+, Node.js 20+, Docker & Docker Compose
+
+```bash
+# 1. Infrastructure
 docker compose up -d postgres redis
-```
 
-### 2. Backend API
-
-```bash
+# 2. Backend API
 cd AgentServer
-
-# Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-
-# Install dependencies
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# Create environment file (see Environment Variables section)
-cp .env.local.example .env.local   # or create manually
-# Edit .env.local with your credentials
-
-# Run database migrations
+cp .env.local.example .env.local   # fill in credentials
 alembic upgrade head
-
-# Start the API server
-python main.py
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-API available at `http://localhost:8000` — Swagger docs at `http://localhost:8000/docs`.
-
-### 3. Frontend UI
-
 ```bash
+# 3. Frontend UI
 cd AgentUi/agent@ui
-
-npm install
-
-# Set backend URL
-echo "VITE_APP_BASE_URL=http://localhost:8000" > .env
-
-npm run dev
+npm install && npm run dev
 ```
 
-UI available at `http://localhost:5173`.
-
-### 4. LiveKit Voice Worker
-
 ```bash
+# 4. LiveKit Voice Worker
 cd AgentServer
 source .venv/bin/activate
-
 python agents/workers/entrypoint.py dev
-```
-
-The worker registers with your LiveKit Cloud project and picks up new room jobs automatically.
-
-### 5. MCP Server (optional)
-
-```bash
-cd cars_mcp
-python server.py
 ```
 
 ---
@@ -322,9 +289,9 @@ python server.py
 ## Setup — Docker (all services)
 
 ```bash
-# Copy and fill in the env files first
-# AgentServer/.env.docker  — backend vars
-# AgentUi/agent@ui/.env    — VITE_APP_BASE_URL=http://localhost:8000
+# Fill in env files first:
+#   AgentServer/.env.docker  — backend vars
+#   AgentUi/agent@ui/.env    — VITE_APP_BASE_URL=http://localhost:8000
 
 docker compose up --build
 ```
@@ -371,13 +338,10 @@ docker compose up --build
 
 ### Voice Agent (`AgentServer/agents/`)
 
-- **`CarServiceAssistant`** — subclasses `livekit.agents.Agent`, initialized with a system prompt that defines it as an auto service center call center manager.
-- **`entrypoint`** — the LiveKit worker entry point. On each new room job it:
-  1. Connects to the room and waits for a participant.
-  2. Initializes an OpenAI Realtime session (`gpt-realtime`, voice `marin`, temperature 0.7, audio+text modalities).
-  3. Starts an `AgentSession` and sends the welcome message.
-- **System prompt** — instructs the agent to collect the caller's VIN, look up their profile, answer questions, and route to the correct department.
-- **Welcome message** — asks for the VIN or offers to create a new profile.
+- **`CarServiceAssistant`** — subclasses `livekit.agents.Agent`. Accepts `instructions` as a constructor parameter so the voice session is driven by the workflow builder, not hardcoded prompts.
+- **`WorkflowLoader`** — reads the full workflow graph (agents, tools, edges) from Postgres at session start. Returns typed `RuntimeWorkflow` / `RuntimeAgent` / `RuntimeEdge` dataclasses consumed by the worker.
+- **`AgentFactory`** — builds a `CarServiceAssistant` and the OpenAI `RealtimeModel` from a `RuntimeAgent`'s DB config (model, temperature, instructions).
+- **`entrypoint`** — the LiveKit worker entry point. On each new room job it parses `workflow_id` from room metadata, loads the matching workflow, and starts the session with the `isInitial` agent's config. Falls back to hardcoded defaults if no workflow ID is present.
 
 ### Workflow Builder UI (`AgentUi/agent@ui/src/`)
 
@@ -395,18 +359,10 @@ Architecture follows a layered pattern:
 Router → Facade (multi-service) → Service (business logic) → Repository (DB) → SQLModel ORM
 ```
 
-- **Facades** (`workflow_facade`, `agent_facade`, `tool_facade`) coordinate multiple services in a single transactional operation (e.g. creating a workflow also creates an initial agent node and its position).
+- **Facades** coordinate multiple services in a single transactional operation (e.g. creating a workflow also creates an initial agent node and its position).
 - **Services** contain domain validation and business rules.
 - **Repositories** are thin data-access wrappers over SQLModel sessions.
 - **`NodeConfig`** stores arbitrary JSONB metadata for each node — this is how the UI persists agent model settings and tool endpoint configs without requiring schema changes.
-
-### MCP Server (`cars_mcp/`)
-
-A **FastMCP** server that exposes tools the voice agent can call:
-- `greet(name)` — basic greeting tool (placeholder, demonstrates the pattern).
-- Car lookup tools backed by a SQLite database with a `Car` model (VIN, make, model, year).
-
-Add new tools by decorating Python functions with `@mcp.tool` in `cars_mcp/server.py`.
 
 ---
 
@@ -416,7 +372,8 @@ Add new tools by decorating Python functions with `@mcp.tool` in `cars_mcp/serve
 - [ ] Unit and integration test suite + CI pipeline
 - [ ] Workflow versioning and import/export (JSON)
 - [ ] Production deployment guide (cloud Postgres, managed Redis, LiveKit Cloud)
-- [ ] Additional MCP tools (appointment booking, parts lookup, service history)
+- [ ] Multi-agent handoff routing engine (evaluate edge conditions at runtime)
+- [ ] HTTP tool registration (convert Tool rows → LiveKit function tools)
 - [ ] Authentication and multi-tenant support
 - [ ] Workflow execution tracing and session replay
 
@@ -436,5 +393,4 @@ Releases are tracked in [CHANGELOG.md](CHANGELOG.md).
 - [FastAPI](https://fastapi.tiangolo.com/) — async Python web framework
 - [SQLModel](https://sqlmodel.tiangolo.com/) — ORM combining SQLAlchemy + Pydantic
 - [ReactFlow / @xyflow](https://reactflow.dev/) — graph canvas for the workflow builder
-- [FastMCP](https://github.com/jlowin/fastmcp) — Python MCP server framework
 - [OpenAI Realtime API](https://platform.openai.com/docs/guides/realtime) — voice-capable LLM backend
