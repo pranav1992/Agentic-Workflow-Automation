@@ -21,6 +21,7 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
 
   useEffect(() => {
     let localTrack = null;
+    let cancelled = false;
     const room = new Room();
     roomRef.current = room;
 
@@ -28,7 +29,6 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
       if (track.kind === Track.Kind.Audio) {
         track.attach(audioRef.current);
         setStatus("agent_speaking");
-        track.on("audioPlaybackStarted", () => setStatus("agent_speaking"));
       }
     });
 
@@ -39,16 +39,30 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
       }
     });
 
-    room.on(RoomEvent.Disconnected, () => setStatus("disconnected"));
+    room.on(RoomEvent.Disconnected, () => {
+      if (!cancelled) setStatus("disconnected");
+    });
 
     (async () => {
-      await room.connect(session.livekit_url, session.token);
-      setStatus("connected");
-      localTrack = await createLocalAudioTrack();
-      await room.localParticipant.publishTrack(localTrack);
+      try {
+        await room.connect(session.livekit_url, session.token);
+        if (cancelled) return;
+        setStatus("connected");
+        localTrack = await createLocalAudioTrack();
+        if (cancelled) return;
+        await room.localParticipant.publishTrack(localTrack);
+      } catch (err) {
+        // "Client initiated disconnect" fires in React StrictMode dev cleanup — safe to ignore.
+        // Real errors (bad URL, invalid token) are logged.
+        if (!cancelled) {
+          console.error("LiveKit connection error:", err.message);
+          setStatus("disconnected");
+        }
+      }
     })();
 
     return () => {
+      cancelled = true;
       localTrack?.stop();
       room.disconnect();
     };

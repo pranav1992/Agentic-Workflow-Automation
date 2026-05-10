@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from livekit import agents
 from livekit.agents import AutoSubscribe, JobContext, AgentSession
 from livekit.plugins import openai
@@ -13,7 +13,7 @@ from agents.agents.agent import VoiceOrchidAgent
 from agents.runtime.workflow_loader import WorkflowLoader
 from agents.runtime.agent_factory import AgentFactory
 
-load_dotenv()
+load_dotenv(find_dotenv(".env.local", usecwd=True) or find_dotenv(".env", usecwd=True))
 
 logger = logging.getLogger(__name__)
 

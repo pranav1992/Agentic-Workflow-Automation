@@ -57,7 +57,7 @@ ui: ## Start Vite dev server with HMR on :5173
 	cd $(UI_DIR) && npm run dev
 
 worker: ## Start LiveKit voice worker (requires LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET in .env.local)
-	cd $(API_DIR) && $(BIN)/python agents/workers/entrypoint.py dev
+	cd $(API_DIR) && PYTHONPATH=. $(BIN)/python agents/workers/entrypoint.py dev
 
 # ── Quality ───────────────────────────────────────────────────
 lint: ## Lint API (ruff) and UI (eslint)
