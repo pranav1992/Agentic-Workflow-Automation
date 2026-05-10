@@ -1,15 +1,38 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { CreateWorkflowDialog } from "../components/workflow";
-import { getWorkflows, deleteWorkflow } from "../api/workflow";
+import { getWorkflows, deleteWorkflow, getWorkflowStatus } from "../api/workflow";
 import createWorkflowService from "../service/workflow_service";
 import { useNavigate } from "react-router";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
+import WorkflowHistoryDrawer from "../components/workflow/WorkflowHistoryDrawer";
+
+function WorkflowStatusBadge({ workflowId }) {
+  const { data } = useQuery({
+    queryKey: ["workflowStatus", workflowId],
+    queryFn: () => getWorkflowStatus(workflowId),
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: false,
+  });
+  const active = data?.status === "active";
+  return (
+    <span
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        color: active ? "#16a34a" : "#9ca3af",
+      }}
+    >
+      {active ? "● Running" : "○ Idle"}
+    </span>
+  );
+}
 // Lightweight workflows list + create flow
 function CreateWorkFlowPage() {
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [descInput, setDescInput] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [historyWorkflowId, setHistoryWorkflowId] = useState(null);
   const navigate = useNavigate();
   const loadingStartRef = useRef(0);
   const [showLoading, setShowLoading] = useState(false);
@@ -298,7 +321,16 @@ function CreateWorkFlowPage() {
                     background: "white",
                   }}
                 >
-                  <div style={{ fontWeight: 600 }}>{wf.name || "Untitled"}</div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600 }}>{wf.name || "Untitled"}</div>
+                    <WorkflowStatusBadge workflowId={wf.id} />
+                  </div>
                   <div style={{ fontSize: 12, color: "#666", margin: "4px 0" }}>
                     id: {wf.id} {wf.version ? `• v${wf.version}` : ""}
                   </div>
@@ -315,6 +347,19 @@ function CreateWorkFlowPage() {
                       }}
                     >
                       Open
+                    </button>
+                    <button
+                      onClick={() => setHistoryWorkflowId(wf.id)}
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: 6,
+                        border: "1px solid #6366f1",
+                        background: "#eef2ff",
+                        color: "#4338ca",
+                        cursor: "pointer",
+                      }}
+                    >
+                      History
                     </button>
                     <button
                       onClick={() => {
@@ -340,6 +385,12 @@ function CreateWorkFlowPage() {
         </div>
       </div>
       {renderNewDialog()}
+      {historyWorkflowId && (
+        <WorkflowHistoryDrawer
+          workflowId={historyWorkflowId}
+          onClose={() => setHistoryWorkflowId(null)}
+        />
+      )}
     </>
   );
 }
