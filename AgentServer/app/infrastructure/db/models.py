@@ -6,6 +6,7 @@ from uuid import uuid4, UUID
 from sqlalchemy import (
     Column,
     Enum as SAEnum,
+    Index,
     UniqueConstraint,
     ForeignKey,
     CheckConstraint,
@@ -22,7 +23,7 @@ class WorkFlow(SQLModel, table=True):  # Persistent Memory / history
     __tablename__ = "workflow"
     __table_args__ = (
         UniqueConstraint("tenant_id", "name_lower", name="uq_workflow_tenant_name"),
-        Column("Index", "idx_workflow_tenant", "tenant_id"),
+        Index("idx_workflow_tenant", "tenant_id"),
     )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     tenant_id: UUID = Field(
@@ -67,7 +68,7 @@ class PositionNode(SQLModel, table=True):
         ),
     )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    tenant_id: UUID = Field()
+    tenant_id: Optional[UUID] = Field(default=None)
     workflow_id: UUID = Field(
         sa_column=Column(ForeignKey("workflow.id", ondelete="CASCADE"))
     )
@@ -100,7 +101,7 @@ class NodeConfig(SQLModel, table=True):
         ),
     )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    tenant_id: UUID = Field()
+    tenant_id: Optional[UUID] = Field(default=None)
     type: NodeType = Field(
         sa_column=Column(SAEnum(NodeType, name="node_type"), nullable=False)
     )
@@ -137,7 +138,7 @@ class Agent(SQLModel, table=True):
         UniqueConstraint("tenant_id", "workflow_id", "name", name="uq_agent_tenant_workflow_name"),
     )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    tenant_id: UUID = Field()
+    tenant_id: Optional[UUID] = Field(default=None)
     name: str = Field(max_length=200, index=True)
     workflow_id: UUID = Field(sa_column=Column(
         ForeignKey("workflow.id", ondelete="CASCADE")))
@@ -169,7 +170,7 @@ class Agent(SQLModel, table=True):
 class Tool(SQLModel, table=True):
     __tablename__ = "tool"
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    tenant_id: UUID = Field()
+    tenant_id: Optional[UUID] = Field(default=None)
     name: str = Field(max_length=200, index=True)
     workflow_id: UUID = Field(
         sa_column=Column(ForeignKey("workflow.id", ondelete="CASCADE"))
@@ -208,7 +209,7 @@ class Tool(SQLModel, table=True):
 class Edge(SQLModel, table=True):
     __tablename__ = "edge"
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    tenant_id: UUID = Field()
+    tenant_id: Optional[UUID] = Field(default=None)
     source: UUID = Field(foreign_key="positionnode.id")
     target: UUID = Field(foreign_key="positionnode.id")
     workflow_id: UUID = Field(
@@ -227,7 +228,7 @@ class Edge(SQLModel, table=True):
 class HandOff(SQLModel, table=True):
     __tablename__ = "handoff"
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    tenant_id: UUID = Field()
+    tenant_id: Optional[UUID] = Field(default=None)
     name: str = Field(max_length=200, index=True)
     workflow_id: UUID = Field(
         sa_column=Column(ForeignKey("workflow.id", ondelete="CASCADE"))
