@@ -1,4 +1,4 @@
-import React, { lazy } from "react";
+import React, { lazy, useState } from "react";
 import { useParams } from "react-router";
 const ToolConfigPanel = lazy(() =>
   import("../components/workflow/panels").then((m) => ({
@@ -25,6 +25,8 @@ import {
   WorkflowCanvas,
   WorkflowSidebar,
 } from "../components/workflow";
+import VoiceSessionPanel from "../components/workflow/VoiceSessionPanel";
+import { launchWorkflow } from "../api/workflow";
 
 function FlowCanvas() {
   const { workflowId: routeWorkflowId } = useParams();
@@ -61,6 +63,18 @@ function FlowCanvas() {
   } = useWorkflowBuilder(routeWorkflowId);
 
   const nodeTypes = { agent: AgentNode, tool: ToolNode };
+  const [sessionState, setSessionState] = useState(null);
+
+  const handleLaunch = async () => {
+    try {
+      const data = await launchWorkflow(workflowId);
+      setSessionState(data);
+    } catch (err) {
+      console.error("Failed to launch workflow", err);
+    }
+  };
+
+  const handleStop = () => setSessionState(null);
 
   return (
     <div
@@ -75,6 +89,9 @@ function FlowCanvas() {
         workflowName={workflowName}
         onFitView={() => reactFlow.fitView()}
         isSaving={isSaving}
+        isSessionActive={!!sessionState}
+        onLaunch={handleLaunch}
+        onStop={handleStop}
       />
 
       <div
@@ -130,6 +147,16 @@ function FlowCanvas() {
           {statusMessage}
         </div>
       )}
+
+      <div style={{ position: "relative" }}>
+        {sessionState && (
+          <VoiceSessionPanel
+            workflowId={workflowId}
+            session={sessionState}
+            onStop={handleStop}
+          />
+        )}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,13 @@
 import React from "react";
 
-export default function WorkflowToolbar({ workflowName, onFitView, isSaving }) {
+export default function WorkflowToolbar({
+  workflowName,
+  onFitView,
+  isSaving,
+  isSessionActive,
+  onLaunch,
+  onStop,
+}) {
   return (
     <div
       style={{
@@ -62,6 +69,40 @@ export default function WorkflowToolbar({ workflowName, onFitView, isSaving }) {
       >
         Update Workflow
       </button>
+
+      <div style={{ marginLeft: "auto" }}>
+        {isSessionActive ? (
+          <button
+            onClick={onStop}
+            style={{
+              padding: "10px 18px",
+              borderRadius: 8,
+              border: "none",
+              background: "#ef4444",
+              color: "white",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            ■ Stop
+          </button>
+        ) : (
+          <button
+            onClick={onLaunch}
+            style={{
+              padding: "10px 18px",
+              borderRadius: 8,
+              border: "none",
+              background: "#16a34a",
+              color: "white",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            ▶ Launch
+          </button>
+        )}
+      </div>
     </div>
   );
 }
