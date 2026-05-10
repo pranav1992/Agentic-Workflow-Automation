@@ -20,14 +20,23 @@ class NodeType(str, PyEnum):
 
 class WorkFlow(SQLModel, table=True):  # Persistent Memory / history
     __tablename__ = "workflow"
-    __table_args__ = (UniqueConstraint("name_lower", name="uq_workflow_name"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name_lower", name="uq_workflow_tenant_name"),
+        Column("Index", "idx_workflow_tenant", "tenant_id"),
+    )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    tenant_id: UUID = Field(
+        sa_column=Column(ForeignKey("tenant.id", ondelete="CASCADE"))
+    )
     name: str = Field(max_length=200, index=True)
     name_lower: Optional[str] = Field(default=None, max_length=200, index=True)
     created_at: datetime = Field(
         default_factory=datetime.now,
         description="Timestamp the snapshot was stored.",
     )
+    updated_at: datetime = Field(default_factory=datetime.now)
+    created_by: Optional[UUID] = Field(default=None)
+    updated_by: Optional[UUID] = Field(default=None)
     agents: list["Agent"] = Relationship(
         back_populates="workflow",
         sa_relationship_kwargs={"lazy": "select", "passive_deletes": True}
@@ -58,6 +67,7 @@ class PositionNode(SQLModel, table=True):
         ),
     )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    tenant_id: UUID = Field()
     workflow_id: UUID = Field(
         sa_column=Column(ForeignKey("workflow.id", ondelete="CASCADE"))
     )
@@ -90,6 +100,7 @@ class NodeConfig(SQLModel, table=True):
         ),
     )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    tenant_id: UUID = Field()
     type: NodeType = Field(
         sa_column=Column(SAEnum(NodeType, name="node_type"), nullable=False)
     )
@@ -123,9 +134,10 @@ class NodeConfig(SQLModel, table=True):
 class Agent(SQLModel, table=True):
     __tablename__ = "agent"
     __table_args__ = (
-        UniqueConstraint("workflow_id", "name", name="uq_agent_workflow_name"),
+        UniqueConstraint("tenant_id", "workflow_id", "name", name="uq_agent_tenant_workflow_name"),
     )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    tenant_id: UUID = Field()
     name: str = Field(max_length=200, index=True)
     workflow_id: UUID = Field(sa_column=Column(
         ForeignKey("workflow.id", ondelete="CASCADE")))
@@ -133,6 +145,8 @@ class Agent(SQLModel, table=True):
     position: UUID | None = Field(default=None, foreign_key="positionnode.id")
     config: UUID | None = Field(default=None, foreign_key="nodeconfig.id")
     isInitial: Optional[bool] = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
     position_node: Optional[PositionNode] = Relationship(
         sa_relationship_kwargs={
             "lazy": "joined", "foreign_keys": "[PositionNode.agent_id]"},
@@ -155,6 +169,7 @@ class Agent(SQLModel, table=True):
 class Tool(SQLModel, table=True):
     __tablename__ = "tool"
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    tenant_id: UUID = Field()
     name: str = Field(max_length=200, index=True)
     workflow_id: UUID = Field(
         sa_column=Column(ForeignKey("workflow.id", ondelete="CASCADE"))
@@ -165,6 +180,8 @@ class Tool(SQLModel, table=True):
     method: str = Field(max_length=10)
     position: UUID | None = Field(default=None, foreign_key="positionnode.id")
     config: UUID | None = Field(default=None, foreign_key="nodeconfig.id")
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
     node_config: Optional[NodeConfig] = Relationship(
         back_populates="tool",
         sa_relationship_kwargs={
@@ -191,6 +208,7 @@ class Tool(SQLModel, table=True):
 class Edge(SQLModel, table=True):
     __tablename__ = "edge"
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    tenant_id: UUID = Field()
     source: UUID = Field(foreign_key="positionnode.id")
     target: UUID = Field(foreign_key="positionnode.id")
     workflow_id: UUID = Field(
@@ -202,11 +220,14 @@ class Edge(SQLModel, table=True):
         sa_column=Column("metadata", JSONB, nullable=True),
         description="Workflow graph payload from UI (nodes, edges, metadata).",
     )
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 class HandOff(SQLModel, table=True):
     __tablename__ = "handoff"
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    tenant_id: UUID = Field()
     name: str = Field(max_length=200, index=True)
     workflow_id: UUID = Field(
         sa_column=Column(ForeignKey("workflow.id", ondelete="CASCADE"))
@@ -217,3 +238,5 @@ class HandOff(SQLModel, table=True):
         sa_column=Column("metadata", JSONB, nullable=False),
         description="Workflow graph payload from UI (nodes, edges, metadata).",
     )
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
