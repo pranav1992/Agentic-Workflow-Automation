@@ -1,5 +1,7 @@
 from sqlmodel import SQLModel, Session, create_engine
 from ...config import settings
+import app.infrastructure.db.auth_models  # noqa: F401 — registers Tenant/User tables in SQLModel metadata
+import app.infrastructure.db.models  # noqa: F401 — registers all domain tables
 
 
 DATABASE_URL = (

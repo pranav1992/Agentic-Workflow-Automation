@@ -7,7 +7,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy import Column, ForeignKey, Index, UniqueConstraint
 from typing import Optional, Dict, Any
 from app.core.constants import UserRole
-from sqlalchemy.dialects.postgresql import UUID as UUID_TYPE
+from sqlalchemy.dialects.postgresql import UUID as UUID_TYPE, JSONB
 
 
 class Tenant(SQLModel, table=True):
@@ -23,13 +23,12 @@ class Tenant(SQLModel, table=True):
     slug: str = Field(max_length=100, unique=True)
     description: Optional[str] = Field(default=None, max_length=500)
     is_active: bool = Field(default=True, index=True)
-    metadata: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(sa_type=type(None)))
+    extra_data: Dict[str, Any] = Field(default_factory=dict, sa_column=Column("metadata", JSONB, nullable=False, server_default="{}"))
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     
     # Relationships
     users: list["User"] = Relationship(back_populates="tenant")
-    workflows: list["WorkflowTenant"] = Relationship(back_populates="tenant")
 
 
 class User(SQLModel, table=True):
@@ -52,7 +51,7 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=True, index=True)
     is_verified: bool = Field(default=False)
     last_login: Optional[datetime] = Field(default=None)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    extra_data: Dict[str, Any] = Field(default_factory=dict, sa_column=Column("metadata", JSONB, nullable=False, server_default="{}"))
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     
@@ -71,12 +70,12 @@ class AuditLog(SQLModel, table=True):
     )
     
     id: UUID = Field(default_factory=uuid4, primary_key=True, sa_type=UUID_TYPE)
-    tenant_id: UUID = Field()
+    tenant_id: Optional[UUID] = Field(default=None)
     user_id: Optional[UUID] = Field(default=None)
     action: str = Field(max_length=50)
     resource_type: str = Field(max_length=50)
     resource_id: Optional[UUID] = Field(default=None, sa_type=UUID_TYPE)
-    details: Dict[str, Any] = Field(default_factory=dict)
+    details: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False, server_default="{}"))
     ip_address: Optional[str] = Field(default=None, max_length=50)
     user_agent: Optional[str] = Field(default=None)
     status: str = Field(default="success", max_length=20)  # success, failure, denied

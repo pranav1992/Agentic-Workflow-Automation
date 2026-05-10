@@ -14,13 +14,10 @@ class AgentService:
     def create(self, agent: AgentCreate):
         try:
             agent = Agent(**agent.model_dump())
-            exist = self.agent_repository.isNameAlreadyExist(
-                agent.name, agent.workflow_id
-            )
-            if exist:
-                raise AgentNameAlreadyExist(agent.name)
         except Exception:
             raise InvalidAgentDataError()
+        if self.agent_repository.isNameAlreadyExist(agent.name, agent.workflow_id):
+            raise AgentNameAlreadyExist(agent.name)
         return self.agent_repository.create(agent)
 
     def update(self, agent):

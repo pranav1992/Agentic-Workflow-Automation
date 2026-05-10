@@ -31,12 +31,13 @@ class AgentRepository:
     def create(self, agent):
         try:
             self.session.add(agent)
-            self.session.commit()
             self.session.flush()
             return agent
-        except IntegrityError:
+        except IntegrityError as e:
             self.session.rollback()
-            raise AgentNameAlreadyExist(agent.name)
+            if "uq_agent_tenant_workflow_name" in str(e.orig):
+                raise AgentNameAlreadyExist(agent.name)
+            raise
         except OperationalError:
             self.session.rollback()
             raise DatabaseUnavailableError()

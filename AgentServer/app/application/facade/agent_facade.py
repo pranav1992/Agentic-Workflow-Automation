@@ -76,7 +76,6 @@ class AgentFacade:
         position = self.position_service.create(position_payload)
         agent.position = position.id
 
-        self.session.commit()
         return agent
 
     def delete_agent(self, agent_id):
