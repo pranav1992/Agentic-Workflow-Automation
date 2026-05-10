@@ -9,7 +9,7 @@ from livekit.agents import AutoSubscribe, JobContext, AgentSession
 from livekit.plugins import openai
 
 from agents.prompts.prompts import INSTRUCTIONS, WELCOME_MESSAGE
-from agents.agents.agent import CarServiceAssistant
+from agents.agents.agent import VoiceOrchidAgent
 from agents.runtime.workflow_loader import WorkflowLoader
 from agents.runtime.agent_factory import AgentFactory
 
@@ -58,7 +58,7 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession(llm=llm)
     await session.start(
         room=ctx.room,
-        agent=CarServiceAssistant(instructions=agent_instructions),
+        agent=VoiceOrchidAgent(instructions=agent_instructions),
     )
     await session.generate_reply(instructions=WELCOME_MESSAGE)
 

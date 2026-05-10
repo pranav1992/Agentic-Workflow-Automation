@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from livekit.plugins import openai
 
-from agents.agents.agent import CarServiceAssistant
+from agents.agents.agent import VoiceOrchidAgent
 from agents.runtime.workflow_loader import RuntimeAgent
 
 
 class AgentFactory:
-    """Builds a LiveKit CarServiceAssistant from a RuntimeAgent dataclass."""
+    """Builds a LiveKit VoiceOrchidAgent from a RuntimeAgent dataclass."""
 
-    def build(self, runtime_agent: RuntimeAgent) -> CarServiceAssistant:
-        return CarServiceAssistant(instructions=runtime_agent.instructions)
+    def build(self, runtime_agent: RuntimeAgent) -> VoiceOrchidAgent:
+        return VoiceOrchidAgent(instructions=runtime_agent.instructions)
 
     def build_realtime_model(
         self, runtime_agent: RuntimeAgent

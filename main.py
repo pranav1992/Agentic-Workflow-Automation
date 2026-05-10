@@ -1,5 +1,5 @@
 def main():
-    print("Hello from carservicevoiceassistant!")
+    print("Hello from VoiceOrchid!")
 
 
 if __name__ == "__main__":

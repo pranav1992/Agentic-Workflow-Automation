@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# stop.sh — stop all running CarServiceVoiceAssistant services
+# stop.sh — stop all running VoiceOrchid services
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
