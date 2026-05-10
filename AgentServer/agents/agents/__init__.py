@@ -1,3 +1,3 @@
-from .agent import CarServiceAssistant
+from .agent import VoiceOrchidAgent
 
-__all__ = ["CarServiceAssistant"]
+__all__ = ["VoiceOrchidAgent"]

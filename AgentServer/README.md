@@ -1,6 +1,6 @@
 # AgentServer
 
-FastAPI backend for the Car Service Voice Assistant. Provides workflow graph APIs, agent and tool management, and LiveKit voice agent entrypoints.
+FastAPI backend for VoiceOrchid. Provides workflow graph APIs, agent and tool management, and LiveKit voice agent entrypoints.
 
 ## Features
 - Workflow graph CRUD (agents, tools, edges, positions)

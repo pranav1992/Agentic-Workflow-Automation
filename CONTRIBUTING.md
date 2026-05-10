@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve Car Service Voice Assistant.
+Thanks for helping improve VoiceOrchid.
 
 ## Ground Rules
 - Be respectful and constructive
@@ -16,7 +16,6 @@ Thanks for helping improve Car Service Voice Assistant.
 ## Development Notes
 - Backend lives in `AgentServer/`
 - UI lives in `AgentUi/agent@ui/`
-- MCP tools live in `cars_mcp/`
 
 ## Tests
 - Backend: add or update tests in `AgentServer/tests/`

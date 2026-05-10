@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
-# start.sh — CarServiceVoiceAssistant local dev launcher
+# start.sh — VoiceOrchid local dev launcher
 # Usage:
 #   ./start.sh          # start all services
 #   ./start.sh api      # backend API only

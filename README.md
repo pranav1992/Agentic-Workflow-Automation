@@ -1,4 +1,4 @@
-# Car Service Voice Assistant
+# VoiceOrchid
 
 A full-stack platform for building and deploying AI-powered voice agents for automotive service centers. Operators compose multi-agent workflows visually in a browser, and customers interact with those workflows through a real-time voice session powered by LiveKit and OpenAI.
 
@@ -55,7 +55,7 @@ The system has two main concerns:
 ┌────────────────────────┴─────────────────────────────────┐
 │               LiveKit Worker (voice runtime)              │
 │  WorkflowLoader ──► RuntimeWorkflow (agents + edges)     │
-│  CarServiceAssistant  ──►  OpenAI Realtime API           │
+│  VoiceOrchidAgent     ──►  OpenAI Realtime API           │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -70,7 +70,7 @@ Call flow:
 ## Repository Structure
 
 ```
-CarServiceVoiceAssistant/
+VoiceOrchid/
 ├── AgentServer/                  # Python backend
 │   ├── app/
 │   │   ├── api/
@@ -95,7 +95,7 @@ CarServiceVoiceAssistant/
 │   │   ├── config.py             # Pydantic settings (reads .env.local)
 │   │   └── main.py               # FastAPI app factory + middleware
 │   ├── agents/
-│   │   ├── agents/agent.py       # CarServiceAssistant (LiveKit Agent)
+│   │   ├── agents/agent.py       # VoiceOrchidAgent (LiveKit Agent)
 │   │   ├── prompts/prompts.py    # System prompt + welcome message
 │   │   ├── runtime/              # Workflow → runtime bridge
 │   │   │   ├── workflow_loader.py  # Loads workflow graph from Postgres
@@ -338,9 +338,9 @@ docker compose up --build
 
 ### Voice Agent (`AgentServer/agents/`)
 
-- **`CarServiceAssistant`** — subclasses `livekit.agents.Agent`. Accepts `instructions` as a constructor parameter so the voice session is driven by the workflow builder, not hardcoded prompts.
+- **`VoiceOrchidAgent`** — subclasses `livekit.agents.Agent`. Accepts `instructions` as a constructor parameter so the voice session is driven by the workflow builder, not hardcoded prompts.
 - **`WorkflowLoader`** — reads the full workflow graph (agents, tools, edges) from Postgres at session start. Returns typed `RuntimeWorkflow` / `RuntimeAgent` / `RuntimeEdge` dataclasses consumed by the worker.
-- **`AgentFactory`** — builds a `CarServiceAssistant` and the OpenAI `RealtimeModel` from a `RuntimeAgent`'s DB config (model, temperature, instructions).
+- **`AgentFactory`** — builds a `VoiceOrchidAgent` and the OpenAI `RealtimeModel` from a `RuntimeAgent`'s DB config (model, temperature, instructions).
 - **`entrypoint`** — the LiveKit worker entry point. On each new room job it parses `workflow_id` from room metadata, loads the matching workflow, and starts the session with the `isInitial` agent's config. Falls back to hardcoded defaults if no workflow ID is present.
 
 ### Workflow Builder UI (`AgentUi/agent@ui/src/`)
