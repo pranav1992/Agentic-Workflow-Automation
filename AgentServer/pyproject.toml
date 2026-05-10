@@ -1,20 +1,46 @@
 [project]
 name = "agentserver"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Production-grade AI agent orchestration platform with multi-tenancy"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    # Core
     "fastapi>=0.132.0",
+    "uvicorn[standard]>=0.41.0",
     "python-dotenv>=1.2.1",
+    
+    # Database
     "sqlmodel>=0.0.37",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.18.4",
+    "psycopg[binary]>=3.3.3",
+    "psycopg2-binary>=2.9.11",
+    
+    # Configuration
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.13.1",
+    
+    # Security & Authentication
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "cryptography>=41.0.0",
+    "PyJWT>=2.8.0",
+    
+    # Caching & Background Jobs
+    "redis>=7.3.0",
+    "celery>=5.4.0",
+    
+    # LiveKit & AI
     "livekit-agents[openai,silero,turn-detector]~=1.4",
     "livekit-api>=1.1.0",
     "livekit-plugins-noise-cancellation~=0.2",
-    "uvicorn>=0.41.0",
-    "psycopg[binary]>=3.3.3",
-    "alembic>=1.18.4",
-    "pydantic-settings>=2.13.1",
-    "psycopg2-binary>=2.9.11",
-    "redis>=7.3.0",
+    
+    # Observability & Logging
+    "python-json-logger>=2.0.0",
+    "structlog>=24.0.0",
+    
+    # Utilities
+    "httpx>=0.25.0",
+    "tenacity>=8.2.0",
 ]
