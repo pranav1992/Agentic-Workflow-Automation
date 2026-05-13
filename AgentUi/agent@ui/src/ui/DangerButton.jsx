@@ -1,14 +1,20 @@
+import theme from "../theme";
+
 export default function DangerButton({ label, onClick }) {
   return (
     <button
       onClick={onClick}
       style={{
-        marginTop: 6,
         width: "100%",
-        background: "#ffe8e8",
-        border: "1px solid #f5b5b5",
-        padding: "8px 10px",
-        cursor: "pointer"
+        padding: "9px 12px",
+        background: theme.errorLight,
+        border: `1px solid ${theme.error}`,
+        borderRadius: theme.radiusLg,
+        color: theme.error,
+        fontSize: 13,
+        fontWeight: 500,
+        cursor: "pointer",
+        letterSpacing: "0.1px",
       }}
     >
       {label}
