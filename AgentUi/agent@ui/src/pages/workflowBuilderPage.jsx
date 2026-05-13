@@ -83,6 +83,7 @@ function FlowCanvas() {
         height: "100vh",
         display: "flex",
         flexDirection: "column",
+        background: "#1c2030",
       }}
     >
       <WorkflowToolbar
@@ -97,9 +98,7 @@ function FlowCanvas() {
       <div
         style={{
           flex: 1,
-          display: "grid",
-          gridTemplateColumns,
-          gap: 0,
+          display: "flex",
           minHeight: 0,
         }}
       >
@@ -139,24 +138,25 @@ function FlowCanvas() {
       {statusMessage && (
         <div
           style={{
-            padding: "8px 16px",
-            borderTop: "1px solid #eee",
-            background: "#fafafa",
+            padding: "7px 20px",
+            borderTop: "1px solid #dadce0",
+            background: "#f8f9fa",
+            fontSize: 12,
+            color: "#5f6368",
+            flexShrink: 0,
           }}
         >
           {statusMessage}
         </div>
       )}
 
-      <div style={{ position: "relative" }}>
-        {sessionState && (
-          <VoiceSessionPanel
-            workflowId={workflowId}
-            session={sessionState}
-            onStop={handleStop}
-          />
-        )}
-      </div>
+      {sessionState && (
+        <VoiceSessionPanel
+          workflowId={workflowId}
+          session={sessionState}
+          onStop={handleStop}
+        />
+      )}
     </div>
   );
 }

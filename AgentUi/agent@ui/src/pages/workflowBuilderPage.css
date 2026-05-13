@@ -1,38 +1,32 @@
+/* Loading overlay — sits over the dark canvas */
 .wf-builder-loading {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  background: radial-gradient(
-      circle at 20% 20%,
-      rgba(255, 255, 255, 0.85),
-      rgba(245, 245, 245, 0.9)
-    ),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(245, 245, 245, 0.7));
+  background: rgba(28, 32, 48, 0.72);
+  backdrop-filter: blur(4px);
   z-index: 10;
-  color: #222;
   text-align: center;
 }
 
 .wf-builder-loading-card {
   display: grid;
   gap: 14px;
-  padding: 22px 24px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow:
-    0 14px 30px rgba(0, 0, 0, 0.08),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.06);
-  min-width: 260px;
+  padding: 24px 28px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 4px 20px rgba(60, 64, 67, 0.22);
+  min-width: 240px;
 }
 
 .wf-builder-spinner {
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  border: 3px solid rgba(0, 0, 0, 0.12);
-  border-top-color: #111;
-  animation: wf-builder-spin 0.9s linear infinite;
+  border: 3px solid #dadce0;
+  border-top-color: #1a73e8;
+  animation: wf-builder-spin 0.85s linear infinite;
   margin: 0 auto;
 }
 
@@ -44,7 +38,7 @@
 .wf-builder-line {
   height: 10px;
   border-radius: 999px;
-  background: #e9e9e9;
+  background: #dadce0;
   position: relative;
   overflow: hidden;
 }
@@ -57,19 +51,63 @@
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.7) 50%,
+    rgba(255, 255, 255, 0.75) 50%,
     rgba(255, 255, 255, 0) 100%
   );
   animation: wf-builder-shimmer 1.4s ease-in-out infinite;
 }
 
 .wf-builder-line.short { width: 70%; }
-.wf-builder-line.tiny { width: 45%; }
+.wf-builder-line.tiny  { width: 45%; }
 
 .wf-builder-caption {
-  font-size: 14px;
+  font-size: 13px;
+  color: #5f6368;
   letter-spacing: 0.2px;
-  color: #333;
+}
+
+/* ReactFlow controls — match the dark canvas */
+.react-flow__controls {
+  background: #ffffff !important;
+  border: 1px solid #dadce0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(60,64,67,0.18) !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: #ffffff !important;
+  border-bottom: 1px solid #f1f3f4 !important;
+  color: #5f6368 !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.react-flow__controls-button:hover {
+  background: #e8f0fe !important;
+  color: #1a73e8 !important;
+}
+
+.react-flow__minimap {
+  background: #262a3d !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+/* Edge label / path on dark canvas */
+.react-flow__edge-path {
+  stroke: #5f85c4 !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #1a73e8 !important;
+}
+
+/* Pulse animation for session indicator dot */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
 }
 
 @keyframes wf-builder-spin {
