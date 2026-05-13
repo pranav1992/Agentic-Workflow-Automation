@@ -1,4 +1,6 @@
 import React from "react";
+import { useNavigate } from "react-router";
+import theme from "../../theme";
 
 export default function WorkflowToolbar({
   workflowName,
@@ -8,101 +10,133 @@ export default function WorkflowToolbar({
   onLaunch,
   onStop,
 }) {
+  const navigate = useNavigate();
+
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 12,
-        padding: "12px 16px",
-        borderBottom: "1px solid #eee",
-        background: "#fafafa",
+        gap: 10,
+        height: 56,
+        padding: "0 20px",
+        borderBottom: `1px solid ${theme.border}`,
+        background: theme.surface,
+        flexShrink: 0,
       }}
     >
-      <input
-        value={workflowName}
-        onChange={() => {}}
-        placeholder="Workflow name"
+      {/* Back */}
+      <button
+        onClick={() => navigate("/")}
         style={{
-          width: 260,
-          padding: "10px 12px",
-          borderRadius: 8,
-          border: "1px solid #ddd",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "6px 10px",
+          borderRadius: theme.radius,
+          border: "none",
+          background: "none",
+          color: theme.textSecondary,
+          fontSize: 13,
+          cursor: "pointer",
+          fontWeight: 500,
         }}
-      />
+      >
+        ← Workflows
+      </button>
+
+      <div style={{ width: 1, height: 24, background: theme.border }} />
+
+      {/* Workflow name */}
+      <span
+        style={{
+          fontSize: 14,
+          fontWeight: 600,
+          color: theme.textPrimary,
+          maxWidth: 240,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {workflowName || "Untitled Workflow"}
+      </span>
+
+      {isSaving && (
+        <span style={{ fontSize: 11, color: theme.textDisabled }}>Saving…</span>
+      )}
+
+      {/* Fit view */}
       <button
         onClick={onFitView}
         style={{
-          padding: "10px 12px",
-          borderRadius: 8,
-          border: "1px solid #ddd",
-          background: "white",
+          marginLeft: 8,
+          padding: "6px 14px",
+          borderRadius: theme.radius,
+          border: `1px solid ${theme.border}`,
+          background: theme.surface,
+          color: theme.textSecondary,
+          fontSize: 13,
           cursor: "pointer",
         }}
       >
-        Fit View
-      </button>
-      <button
-        onClick={() => {}}
-        style={{
-          padding: "10px 12px",
-          borderRadius: 8,
-          border: "1px solid #ddd",
-          background: "white",
-          cursor: "pointer",
-        }}
-      >
-        Back to List
-      </button>
-      <button
-        onClick={() => {}}
-        disabled={isSaving}
-        style={{
-          padding: "10px 14px",
-          borderRadius: 8,
-          border: "none",
-          background: "#111",
-          color: "white",
-          cursor: "pointer",
-          opacity: isSaving ? 0.7 : 1,
-        }}
-      >
-        Update Workflow
+        ⊹ Fit View
       </button>
 
-      <div style={{ marginLeft: "auto" }}>
-        {isSessionActive ? (
-          <button
-            onClick={onStop}
+      {/* Spacer */}
+      <div style={{ flex: 1 }} />
+
+      {/* Session status dot */}
+      {isSessionActive && (
+        <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: theme.success }}>
+          <span
             style={{
-              padding: "10px 18px",
-              borderRadius: 8,
-              border: "none",
-              background: "#ef4444",
-              color: "white",
-              cursor: "pointer",
-              fontWeight: 600,
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: theme.success,
+              display: "inline-block",
+              animation: "pulse 1.4s ease-in-out infinite",
             }}
-          >
-            ■ Stop
-          </button>
-        ) : (
-          <button
-            onClick={onLaunch}
-            style={{
-              padding: "10px 18px",
-              borderRadius: 8,
-              border: "none",
-              background: "#16a34a",
-              color: "white",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            ▶ Launch
-          </button>
-        )}
-      </div>
+          />
+          Session active
+        </span>
+      )}
+
+      {/* Launch / Stop */}
+      {isSessionActive ? (
+        <button
+          onClick={onStop}
+          style={{
+            padding: "8px 20px",
+            borderRadius: theme.radius,
+            border: "none",
+            background: theme.error,
+            color: "white",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          ■ Stop
+        </button>
+      ) : (
+        <button
+          onClick={onLaunch}
+          style={{
+            padding: "8px 20px",
+            borderRadius: theme.radius,
+            border: "none",
+            background: theme.primary,
+            color: "white",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          ▶ Launch
+        </button>
+      )}
     </div>
   );
 }
