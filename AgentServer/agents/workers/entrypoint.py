@@ -59,7 +59,10 @@ async def entrypoint(ctx: JobContext):
     agent._welcome_message = initial.welcome_message
 
     session = AgentSession(llm=llm)
-    await session.start(room=ctx.room, agent=agent)
+    try:
+        await session.start(room=ctx.room, agent=agent)
+    except Exception:
+        logger.exception("AgentSession ended with an error (room may have been deleted)")
 
 
 def _parse_workflow_id(metadata: str | None) -> str | None:
