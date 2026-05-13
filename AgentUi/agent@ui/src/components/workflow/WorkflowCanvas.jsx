@@ -17,7 +17,7 @@ export default function WorkflowCanvas({
   onMoveEnd,
 }) {
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: "relative", flex: 1, height: "100%" }}>
       <WorkflowLoadingOverlay show={showLoading} />
       <ReactFlow
         nodes={nodes}
@@ -32,7 +32,7 @@ export default function WorkflowCanvas({
         onEdgeClick={onEdgeClick}
         onMoveEnd={onMoveEnd}
         fitView
-        style={{ width: "100%", height: "100%" }}
+        style={{ width: "100%", height: "100%", background: "#1c2030" }}
       >
         <Controls />
       </ReactFlow>
