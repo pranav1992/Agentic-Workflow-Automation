@@ -10,11 +10,14 @@ class NodeConfigRepository:
         self.session.flush()
         return node_config
 
-    def update(self, node_config):
-        self.session.merge(node_config)
+    def update(self, config_id, config_data: dict):
+        existing = self.session.get(NodeConfig, config_id)
+        if existing is None:
+            return None
+        existing.config = config_data
         self.session.commit()
-        self.session.refresh(node_config)
-        return node_config
+        self.session.refresh(existing)
+        return existing
 
     def delete(self, node_config_id):
         node_config = self.session.get(NodeConfig, node_config_id)
