@@ -33,6 +33,12 @@ class AgentFacade:
         config.workflow_id = agent.workflow_id
         if not config.config.get("systemPrompt"):
             config.config["systemPrompt"] = _DEFAULT_INSTRUCTIONS.strip()
+        if not config.config.get("model"):
+            config.config["model"] = "gpt-4o-realtime-preview"
+        if config.config.get("temperature") is None:
+            config.config["temperature"] = 0.7
+        if config.config.get("maxTokens") is None:
+            config.config["maxTokens"] = 1024
         node_config = self.node_config_service.create(config)
         agent.config = node_config.id
 
@@ -63,7 +69,12 @@ class AgentFacade:
         config = NodeConfigCreate(
             type="agent",
             workflow_id=agent_data.workflow_id,
-            metadata={"systemPrompt": _DEFAULT_INSTRUCTIONS.strip()},
+            metadata={
+                "systemPrompt": _DEFAULT_INSTRUCTIONS.strip(),
+                "model": "gpt-4o-realtime-preview",
+                "temperature": 0.7,
+                "maxTokens": 1024,
+            },
             agent_id=agent.id,
         )
 
