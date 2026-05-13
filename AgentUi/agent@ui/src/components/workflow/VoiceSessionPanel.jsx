@@ -6,12 +6,13 @@ import {
   Track,
 } from "livekit-client";
 import { stopWorkflow } from "../../api/workflow";
+import theme from "../../theme";
 
 const STATUS_LABELS = {
-  connecting: "Connecting…",
-  connected: "Listening",
-  agent_speaking: "Agent speaking",
-  disconnected: "Disconnected",
+  connecting:    "Connecting…",
+  connected:     "Listening",
+  agent_speaking:"Agent speaking",
+  disconnected:  "Disconnected",
 };
 
 export default function VoiceSessionPanel({ workflowId, session, onStop }) {
@@ -53,7 +54,6 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         await room.localParticipant.publishTrack(localTrack);
       } catch (err) {
         // "Client initiated disconnect" fires in React StrictMode dev cleanup — safe to ignore.
-        // Real errors (bad URL, invalid token) are logged.
         if (!cancelled) {
           console.error("LiveKit connection error:", err.message);
           setStatus("disconnected");
@@ -75,48 +75,64 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
   };
 
   const isActive = status !== "disconnected";
+  const isSpeaking = status === "agent_speaking";
+
+  const statusColor = {
+    connecting:    theme.textDisabled,
+    connected:     "#34a853",
+    agent_speaking:"#fbbc04",
+    disconnected:  theme.error,
+  }[status] ?? theme.textDisabled;
 
   return (
     <div
       style={{
-        position: "absolute",
+        position: "fixed",
         bottom: 0,
         left: 0,
         right: 0,
-        height: 80,
-        background: "#111",
+        height: 72,
+        background: "rgba(28,32,48,0.96)",
+        backdropFilter: "blur(8px)",
         color: "white",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 24px",
-        zIndex: 10,
-        borderTop: "2px solid #333",
+        padding: "0 28px",
+        zIndex: 50,
+        borderTop: `1px solid rgba(255,255,255,0.1)`,
       }}
     >
       <audio ref={audioRef} autoPlay style={{ display: "none" }} />
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <SpeakingIndicator active={status === "agent_speaking"} />
-        <span style={{ fontSize: 14, opacity: 0.9 }}>
-          {STATUS_LABELS[status] ?? status}
-        </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <SpeakingIndicator active={isSpeaking} />
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: "white" }}>
+            Voice Session
+          </div>
+          <div style={{ fontSize: 12, color: statusColor, marginTop: 1 }}>
+            {STATUS_LABELS[status] ?? status}
+          </div>
+        </div>
       </div>
 
       {isActive && (
         <button
           onClick={handleStop}
           style={{
-            padding: "8px 20px",
-            borderRadius: 8,
+            padding: "8px 22px",
+            borderRadius: theme.radius,
             border: "none",
-            background: "#ef4444",
+            background: theme.error,
             color: "white",
-            cursor: "pointer",
+            fontSize: 13,
             fontWeight: 600,
+            cursor: "pointer",
+            letterSpacing: "0.2px",
           }}
         >
-          Stop
+          ■ Stop
         </button>
       )}
     </div>
@@ -125,17 +141,17 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
 
 function SpeakingIndicator({ active }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-      {[0, 1, 2].map((i) => (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 22 }}>
+      {[0, 1, 2, 3].map((i) => (
         <div
           key={i}
           style={{
             width: 4,
             borderRadius: 2,
-            background: active ? "#22c55e" : "#555",
-            height: active ? 16 + i * 6 : 8,
-            transition: "height 0.2s ease",
-            animationDelay: `${i * 0.1}s`,
+            background: active ? "#34a853" : "rgba(255,255,255,0.25)",
+            height: active ? `${10 + ((i * 7) % 14)}px` : "6px",
+            transition: "height 0.25s ease, background 0.25s ease",
+            transitionDelay: `${i * 60}ms`,
           }}
         />
       ))}
