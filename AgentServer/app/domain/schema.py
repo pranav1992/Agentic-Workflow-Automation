@@ -52,8 +52,10 @@ class InititialAgent(BaseModel):
 
 
 class AgentCreate(BaseModel):
+    id: Optional[UUID] = None
     name: str
     workflow_id: UUID
+    isInitial: Optional[bool] = None
 
 
 class AgentPayload(BaseModel):

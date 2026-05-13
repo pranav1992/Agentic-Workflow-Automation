@@ -13,19 +13,21 @@ class AgentService:
 
     def create(self, agent: AgentCreate):
         try:
-            agent = Agent(**agent.model_dump())
+            agent = Agent(**agent.model_dump(exclude_none=True))
         except Exception:
             raise InvalidAgentDataError()
         if self.agent_repository.isNameAlreadyExist(agent.name, agent.workflow_id):
             raise AgentNameAlreadyExist(agent.name)
         return self.agent_repository.create(agent)
 
-    def update(self, agent):
+    def update(self, agent: AgentCreate):
+        if not agent.id:
+            raise InvalidAgentDataError()
         try:
-            agent = Agent(**agent.model_dump())
+            data = Agent(id=agent.id, name=agent.name, workflow_id=agent.workflow_id, isInitial=agent.isInitial)
         except Exception:
             raise InvalidAgentDataError()
-        return self.agent_repository.update(agent)
+        return self.agent_repository.update(data)
 
     def delete(self, agent_id):
 

@@ -8,7 +8,7 @@ import {
   reconnectEdge,
 } from "@xyflow/react";
 import { getWorkflow, get_all_nodes } from "../../api/workflow";
-import { createAgent, deleteAgentApi } from "../../api/agent";
+import { createAgent, updateAgent, deleteAgentApi } from "../../api/agent";
 import { createTool, deleteTool as deleteToolApi } from "../../api/tool";
 import { updatePosition, updatePositionsBulk } from "../../api/position";
 import {
@@ -197,6 +197,24 @@ export function useWorkflowBuilder(routeWorkflowId) {
     onError: (err) => {
       const detail =
         err?.response?.data?.detail || err.message || "Failed to delete agent";
+      setStatusMessage(detail);
+    },
+  });
+
+  const updateAgentMutation = useMutation({
+    mutationFn: (payload) => updateAgent(payload),
+    onSuccess: (updated) => {
+      const serialized = agentSerializer(updated);
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === serialized.id ? { ...n, data: { ...n.data, ...serialized.data } } : n,
+        ),
+      );
+      setStatusMessage("Agent saved");
+    },
+    onError: (err) => {
+      const detail =
+        err?.response?.data?.detail || err.message || "Failed to save agent";
       setStatusMessage(detail);
     },
   });
@@ -460,9 +478,33 @@ export function useWorkflowBuilder(routeWorkflowId) {
   }, [clearSelection]);
 
   const onSavePanel = useCallback(() => {
+    if (selectedAgent) {
+      const { data } = selectedAgent;
+      updateAgentMutation.mutate({
+        agent: {
+          id: selectedAgent.id,
+          name: data.name,
+          workflow_id: workflowId,
+          isInitial: Boolean(data.isInitial),
+        },
+        agent_config: {
+          id: data.configId,
+          type: "agent",
+          workflow_id: workflowId,
+          config: {
+            systemPrompt: data.systemPrompt,
+            welcomeMessage: data.welcomeMessage,
+            model: data.model,
+            temperature: data.temperature,
+            maxTokens: data.maxTokens,
+            language: data.language,
+          },
+        },
+      });
+    }
     setSidebarOpen(false);
     clearSelection();
-  }, [clearSelection]);
+  }, [selectedAgent, workflowId, clearSelection, updateAgentMutation]);
 
   const openAgentConfig = useCallback((agentId) => {
     setSelectedAgentId(agentId);

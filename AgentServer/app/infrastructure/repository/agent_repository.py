@@ -48,10 +48,12 @@ class AgentRepository:
             if existing is None:
                 raise AgentNotFoundError(agent.id)
 
-            self.session.merge(agent)
+            existing.name = agent.name
+            if agent.isInitial is not None:
+                existing.isInitial = agent.isInitial
             self.session.commit()
-            self.session.refresh(agent)
-            return agent
+            self.session.refresh(existing)
+            return existing
         except OperationalError:
             self.session.rollback()
             raise DatabaseUnavailableError()
