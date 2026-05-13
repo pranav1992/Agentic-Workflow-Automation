@@ -13,7 +13,7 @@ from app.domain.schema import (
     NodeConfigCreate,
     PositionCreate,
 )
-from agents.prompts.prompts import INSTRUCTIONS as _DEFAULT_INSTRUCTIONS
+from agents.prompts.prompts import INSTRUCTIONS as _DEFAULT_INSTRUCTIONS, WELCOME_MESSAGE as _DEFAULT_WELCOME
 
 
 class AgentFacade:  
@@ -33,6 +33,8 @@ class AgentFacade:
         config.workflow_id = agent.workflow_id
         if not config.config.get("systemPrompt"):
             config.config["systemPrompt"] = _DEFAULT_INSTRUCTIONS.strip()
+        if not config.config.get("welcomeMessage"):
+            config.config["welcomeMessage"] = _DEFAULT_WELCOME.strip()
         if not config.config.get("model"):
             config.config["model"] = "gpt-4o-realtime-preview"
         if config.config.get("temperature") is None:
@@ -71,6 +73,7 @@ class AgentFacade:
             workflow_id=agent_data.workflow_id,
             metadata={
                 "systemPrompt": _DEFAULT_INSTRUCTIONS.strip(),
+                "welcomeMessage": _DEFAULT_WELCOME.strip(),
                 "model": "gpt-4o-realtime-preview",
                 "temperature": 0.7,
                 "maxTokens": 1024,

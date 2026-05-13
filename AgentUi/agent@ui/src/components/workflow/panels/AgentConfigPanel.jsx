@@ -150,6 +150,14 @@ export default function AgentConfigPanel({
       <SectionLabel>Prompt</SectionLabel>
 
       <LabeledTextarea
+        label="Greeting"
+        value={agent.data.welcomeMessage || ""}
+        onChange={(v) => onChange(agent.id, { welcomeMessage: v })}
+        placeholder="Begin by welcoming the user..."
+        rows={3}
+      />
+
+      <LabeledTextarea
         label="System Prompt"
         value={agent.data.systemPrompt}
         onChange={(v) => onChange(agent.id, { systemPrompt: v })}

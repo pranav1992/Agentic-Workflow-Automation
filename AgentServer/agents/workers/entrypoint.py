@@ -8,7 +8,7 @@ from livekit import agents
 from livekit.agents import AutoSubscribe, JobContext, AgentSession
 from livekit.plugins import openai
 
-from agents.prompts.prompts import INSTRUCTIONS
+from agents.prompts.prompts import INSTRUCTIONS, WELCOME_MESSAGE
 from agents.agents.agent import VoiceOrchidAgent
 from agents.runtime.workflow_loader import WorkflowLoader
 from agents.runtime.agent_factory import AgentFactory
@@ -24,6 +24,7 @@ async def entrypoint(ctx: JobContext):
 
     # --- Resolve agent config from workflow (if room metadata carries workflow_id) ---
     agent_instructions = INSTRUCTIONS
+    agent_welcome = WELCOME_MESSAGE
     agent_model = "gpt-4o-realtime-preview"
     agent_temperature = 0.7
 
@@ -34,6 +35,7 @@ async def entrypoint(ctx: JobContext):
             initial = runtime_workflow.initial_agent
             if initial:
                 agent_instructions = initial.instructions
+                agent_welcome = initial.welcome_message
                 agent_model = initial.model
                 agent_temperature = initial.temperature
                 logger.info(
@@ -58,7 +60,7 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession(llm=llm)
     await session.start(
         room=ctx.room,
-        agent=VoiceOrchidAgent(instructions=agent_instructions),
+        agent=VoiceOrchidAgent(instructions=agent_instructions, welcome_message=agent_welcome),
     )
 
 
