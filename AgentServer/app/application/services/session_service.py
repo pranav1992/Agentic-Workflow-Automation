@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from livekit import api
 
@@ -27,7 +27,12 @@ class SessionService:
         )
 
     async def launch(self, workflow_id: UUID) -> WorkflowLaunchResponse:
-        room_name = f"workflow-{workflow_id}"
+        # Generate session ID first so it can be embedded in the room name.
+        # Using a unique room name per session guarantees LiveKit always
+        # dispatches a fresh worker job — reusing the same name causes the
+        # server to skip dispatch on subsequent launches of the same workflow.
+        session_id = uuid4()
+        room_name = f"workflow-{workflow_id}-{session_id}"
         metadata = json.dumps({"workflow_id": str(workflow_id)})
 
         lk = self._lk_client()
@@ -48,6 +53,7 @@ class SessionService:
         )
 
         session = WorkflowSession(
+            id=session_id,
             workflow_id=workflow_id,
             room_name=room_name,
             status="active",
