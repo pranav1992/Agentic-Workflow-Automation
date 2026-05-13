@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Room,
   RoomEvent,
+  ConnectionState,
   createLocalAudioTrack,
   Track,
 } from "livekit-client";
@@ -23,8 +24,7 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
   useEffect(() => {
     let localTrack    = null;
     let cancelled     = false;
-    let didConnect    = false;   // guard against StrictMode pre-connect cleanup
-    const audioEls    = [];      // { el } pairs for cleanup
+    const audioEls    = [];      // el elements for cleanup
 
     const room = new Room();
     roomRef.current = room;
@@ -76,7 +76,6 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
       try {
         await room.connect(session.livekit_url, session.token);
         if (cancelled) return;
-        didConnect = true;
         setStatus("connected");
 
         // Resume Web Audio context — safe here because we're still in
@@ -104,10 +103,11 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         el.remove();
       });
       audioEls.length = 0;
-      // Only call disconnect if we actually reached the connected state —
-      // avoids the React StrictMode "user initiated disconnect" noise where
-      // cleanup fires before connect() has even resolved
-      if (didConnect) {
+      // Skip disconnect only if room never started connecting (e.g. StrictMode
+      // fires cleanup before connect() is even called). Once connecting/connected
+      // we must disconnect or the zombie room leaves a broken WebRTC peer on
+      // the next mount.
+      if (room.state !== ConnectionState.Disconnected) {
         room.disconnect();
       }
     };
