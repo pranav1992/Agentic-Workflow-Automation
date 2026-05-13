@@ -13,8 +13,10 @@ class NodeConfigService:
         return self.node_config_repo.create(data)
 
     def update(self, node_config):
-        data = NodeConfig(**node_config.model_dump())
-        return self.node_config_repo.update(data)
+        config_id = getattr(node_config, "id", None)
+        if not config_id:
+            return None
+        return self.node_config_repo.update(config_id, node_config.config)
 
     def get(self, node_config_id):
         return self.node_config_repo.get_node_config(node_config_id)
