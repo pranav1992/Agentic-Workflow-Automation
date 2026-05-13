@@ -71,6 +71,8 @@ class SessionService:
             await lk.room.delete_room(
                 api.DeleteRoomRequest(room=session.room_name)
             )
+        except Exception:
+            pass  # room may already be gone
         finally:
             await lk.aclose()
 
