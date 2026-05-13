@@ -2,7 +2,7 @@
 
 A full-stack platform for building and deploying AI-powered voice agents for automotive service centers. Operators compose multi-agent workflows visually in a browser, and customers interact with those workflows through a real-time voice session powered by LiveKit and OpenAI.
 
-**Status:** Alpha — actively iterating.
+**Status:** Working — voice sessions functional end-to-end.
 
 ---
 
@@ -266,9 +266,11 @@ make api
 make install-ui
 make ui
 
-# Terminal 4 — LiveKit voice worker
+# Terminal 4 — LiveKit voice worker  ← REQUIRED for voice sessions
 make worker
 ```
+
+> **The worker must always be running.** It is the process that joins the LiveKit room and speaks. If the worker is not running, the browser will connect and the mic will activate, but the agent will never appear — the session will sit at "Waiting for agent" indefinitely.
 
 Run `make help` to see all available targets.
 
@@ -319,10 +321,7 @@ Worker  → loads workflow from Postgres, starts OpenAI Realtime session
   LIVEKIT_API_KEY=your-api-key
   LIVEKIT_API_SECRET=your-api-secret
   ```
-- **The voice worker must be running** (in a separate terminal):
-  ```bash
-  make worker
-  ```
+- **The voice worker must be running** (`make worker` in a separate terminal). This is the most common reason a session appears to connect but produces no audio — the browser diagnostic strip will show "⏳ Waiting for agent" if the worker is not active.
 - A modern browser with microphone support (Chrome / Edge recommended).
 
 ### Session History
