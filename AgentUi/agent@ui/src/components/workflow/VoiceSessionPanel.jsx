@@ -16,10 +16,12 @@ const STATUS_LABELS = {
 };
 
 export default function VoiceSessionPanel({ workflowId, session, onStop }) {
-  const roomRef     = useRef(null);
-  // Stored as ref so handleUnblockAudio can replay them outside the effect closure
-  const audioEls    = useRef([]);  // [{ track, el }]
-  const [status, setStatus]         = useState("connecting");
+  const roomRef          = useRef(null);
+  const audioEls         = useRef([]);  // [{ track, el }]
+  const [status, setStatus]           = useState("connecting");
+  // audioEnabled: user has clicked the button at least once (gesture captured)
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  // audioBlocked: livekit says playback still can't happen even after enabling
   const [audioBlocked, setAudioBlocked] = useState(false);
 
   useEffect(() => {
@@ -30,26 +32,25 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     const room = new Room();
     roomRef.current = room;
 
-    // livekit fires this when its AudioManager detects playback is blocked/unblocked
     room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
+      // livekit tells us playback is blocked — show button again
       setAudioBlocked(!room.canPlaybackAudio);
     });
 
     room.on(RoomEvent.TrackSubscribed, (track) => {
       if (track.kind !== Track.Kind.Audio) return;
 
-      // track.attach() creates an element livekit's AudioManager knows about,
-      // so room.startAudio() (called from handleUnblockAudio) will play it.
+      // track.attach() creates the element, sets srcObject, and internally
+      // calls el.play(). Do NOT call el.play() again — a second call aborts
+      // the first one with AbortError, which livekit silently ignores,
+      // preventing AudioPlaybackFailed / AudioPlaybackStatusChanged from firing.
+      // Do NOT override el.muted / el.volume here either — livekit may be
+      // routing audio through the Web Audio API and sets muted=true intentionally.
       const el = track.attach();
-      el.muted  = false;
-      el.volume = 1;
       document.body.appendChild(el);
       audioEls.current.push({ track, el });
 
-      // Attempt immediate play; browser may block this if there was no recent
-      // user gesture — the AudioPlaybackStatusChanged handler will surface the
-      // "Enable Audio" button in that case.
-      el.play().catch(() => setAudioBlocked(true));
+      console.log("[VoiceSession] TrackSubscribed", track.kind, track.sid);
       setStatus("agent_speaking");
     });
 
@@ -75,16 +76,15 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         await room.connect(session.livekit_url, session.token);
         if (cancelled) return;
         setStatus("connected");
-
-        // Resume livekit's AudioContext so future track.attach() elements can play
-        await room.startAudio();
+        console.log("[VoiceSession] Connected to room");
 
         localTrack = await createLocalAudioTrack();
         if (cancelled) return;
         await room.localParticipant.publishTrack(localTrack);
+        console.log("[VoiceSession] Mic published");
       } catch (err) {
         if (!cancelled) {
-          console.error("LiveKit connection error:", err.message);
+          console.error("[VoiceSession] Connection error:", err.message);
           setStatus("disconnected");
         }
       }
@@ -103,13 +103,18 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     };
   }, [session]);
 
-  const handleUnblockAudio = async () => {
-    // room.startAudio() resumes livekit's AudioContext AND plays all elements
-    // that were created via track.attach() — this is why we use attach() above.
-    await roomRef.current?.startAudio();
-    // Belt-and-suspenders: explicitly replay any element that stalled
-    audioEls.current.forEach(({ el }) => el.play().catch(() => {}));
-    setAudioBlocked(false);
+  // Called when the user clicks "Enable Audio" — MUST happen in a user gesture
+  // so room.startAudio() can resume the AudioContext and allow el.play().
+  const handleEnableAudio = async () => {
+    try {
+      await roomRef.current?.startAudio();
+      setAudioEnabled(true);
+      setAudioBlocked(false);
+      console.log("[VoiceSession] Audio enabled via startAudio()");
+    } catch (err) {
+      console.warn("[VoiceSession] startAudio() failed:", err.message);
+      setAudioBlocked(true);
+    }
   };
 
   const handleStop = async () => {
@@ -120,6 +125,9 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
 
   const isActive   = status !== "disconnected";
   const isSpeaking = status === "agent_speaking";
+
+  // Show the button if audio hasn't been enabled yet, or if livekit re-blocked it
+  const showAudioButton = isActive && (!audioEnabled || audioBlocked);
 
   const statusColor = {
     connecting:     theme.textDisabled,
@@ -160,9 +168,9 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {audioBlocked && (
+        {showAudioButton && (
           <button
-            onClick={handleUnblockAudio}
+            onClick={handleEnableAudio}
             style={{
               padding: "7px 16px",
               borderRadius: theme.radius,
@@ -174,7 +182,7 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
               cursor: "pointer",
             }}
           >
-            🔇 Enable Audio
+            🔊 Enable Audio
           </button>
         )}
         {isActive && (
