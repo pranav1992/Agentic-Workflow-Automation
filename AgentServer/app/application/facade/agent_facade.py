@@ -57,9 +57,9 @@ class AgentFacade:
         return agent
 
     def update_agent(self, agent_data: AgentPayload):
-        # update config first so FK remains valid
         config = agent_data.agent_config
-        self.node_config_service.update(config)
+        if getattr(config, "id", None):
+            self.node_config_service.update(config)
         return self.agent_service.update(agent_data.agent)
 
     def get_agent(self, agent_id):
