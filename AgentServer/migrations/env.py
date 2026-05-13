@@ -4,7 +4,8 @@ from alembic import context
 
 # Import project metadata / engine
 from app.infrastructure.db.engine import engine
-from app.infrastructure.db import models
+from app.infrastructure.db import models  # noqa: F401
+import app.infrastructure.db.auth_models  # noqa: F401 — registers Tenant/User in SQLModel metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
