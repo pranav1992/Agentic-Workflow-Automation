@@ -16,13 +16,18 @@ const STATUS_LABELS = {
 };
 
 export default function VoiceSessionPanel({ workflowId, session, onStop }) {
-  const roomRef          = useRef(null);
-  const audioEls         = useRef([]);  // [{ track, el }]
-  const [status, setStatus]           = useState("connecting");
-  // audioEnabled: user has clicked the button at least once (gesture captured)
+  const roomRef     = useRef(null);
+  const audioEls    = useRef([]);
+  const [status, setStatus]             = useState("connecting");
   const [audioEnabled, setAudioEnabled] = useState(false);
-  // audioBlocked: livekit says playback still can't happen even after enabling
   const [audioBlocked, setAudioBlocked] = useState(false);
+  // diagnostic state
+  const [diag, setDiag] = useState({
+    agentJoined: false,
+    tracksSubscribed: 0,
+    micPublished: false,
+    lastError: null,
+  });
 
   useEffect(() => {
     let localTrack = null;
@@ -33,24 +38,24 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     roomRef.current = room;
 
     room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
-      // livekit tells us playback is blocked — show button again
       setAudioBlocked(!room.canPlaybackAudio);
     });
 
-    room.on(RoomEvent.TrackSubscribed, (track) => {
+    // Track when remote participants (the agent) join
+    room.on(RoomEvent.ParticipantConnected, (participant) => {
+      console.log("[VoiceSession] Participant connected:", participant.identity);
+      setDiag(d => ({ ...d, agentJoined: true }));
+    });
+
+    room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+      console.log("[VoiceSession] TrackSubscribed kind=%s from=%s", track.kind, participant.identity);
       if (track.kind !== Track.Kind.Audio) return;
 
-      // track.attach() creates the element, sets srcObject, and internally
-      // calls el.play(). Do NOT call el.play() again — a second call aborts
-      // the first one with AbortError, which livekit silently ignores,
-      // preventing AudioPlaybackFailed / AudioPlaybackStatusChanged from firing.
-      // Do NOT override el.muted / el.volume here either — livekit may be
-      // routing audio through the Web Audio API and sets muted=true intentionally.
+      setDiag(d => ({ ...d, tracksSubscribed: d.tracksSubscribed + 1 }));
+
       const el = track.attach();
       document.body.appendChild(el);
       audioEls.current.push({ track, el });
-
-      console.log("[VoiceSession] TrackSubscribed", track.kind, track.sid);
       setStatus("agent_speaking");
     });
 
@@ -64,6 +69,7 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         el.remove();
         audioEls.current.splice(idx, 1);
       }
+      setDiag(d => ({ ...d, tracksSubscribed: Math.max(0, d.tracksSubscribed - 1) }));
       if (audioEls.current.length === 0) setStatus("connected");
     });
 
@@ -76,15 +82,22 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         await room.connect(session.livekit_url, session.token);
         if (cancelled) return;
         setStatus("connected");
-        console.log("[VoiceSession] Connected to room");
+        console.log("[VoiceSession] Connected. Participants:", room.remoteParticipants.size);
+
+        // Check if agent is already in room (joined before us)
+        if (room.remoteParticipants.size > 0) {
+          setDiag(d => ({ ...d, agentJoined: true }));
+        }
 
         localTrack = await createLocalAudioTrack();
         if (cancelled) return;
         await room.localParticipant.publishTrack(localTrack);
+        setDiag(d => ({ ...d, micPublished: true }));
         console.log("[VoiceSession] Mic published");
       } catch (err) {
         if (!cancelled) {
-          console.error("[VoiceSession] Connection error:", err.message);
+          console.error("[VoiceSession] Error:", err.message);
+          setDiag(d => ({ ...d, lastError: err.message }));
           setStatus("disconnected");
         }
       }
@@ -103,14 +116,20 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     };
   }, [session]);
 
-  // Called when the user clicks "Enable Audio" — MUST happen in a user gesture
-  // so room.startAudio() can resume the AudioContext and allow el.play().
   const handleEnableAudio = async () => {
     try {
+      // Must be called in user gesture — resumes AudioContext so future
+      // track.attach() el.play() calls succeed automatically
       await roomRef.current?.startAudio();
       setAudioEnabled(true);
       setAudioBlocked(false);
-      console.log("[VoiceSession] Audio enabled via startAudio()");
+      console.log("[VoiceSession] startAudio() succeeded");
+
+      // Also try to play any elements already attached (agent spoke before click)
+      audioEls.current.forEach(({ el }) => {
+        el.muted = false;
+        el.play().catch(() => {});
+      });
     } catch (err) {
       console.warn("[VoiceSession] startAudio() failed:", err.message);
       setAudioBlocked(true);
@@ -125,8 +144,6 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
 
   const isActive   = status !== "disconnected";
   const isSpeaking = status === "agent_speaking";
-
-  // Show the button if audio hasn't been enabled yet, or if livekit re-blocked it
   const showAudioButton = isActive && (!audioEnabled || audioBlocked);
 
   const statusColor = {
@@ -143,66 +160,109 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         bottom: 0,
         left: 0,
         right: 0,
-        height: 72,
-        background: "rgba(28,32,48,0.96)",
+        background: "rgba(28,32,48,0.97)",
         backdropFilter: "blur(8px)",
         color: "white",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 28px",
         zIndex: 50,
         borderTop: "1px solid rgba(255,255,255,0.1)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <SpeakingIndicator active={isSpeaking} />
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "white" }}>
-            Voice Session
+      {/* Main bar */}
+      <div
+        style={{
+          height: 64,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 24px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <SpeakingIndicator active={isSpeaking} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "white" }}>
+              Voice Session
+            </div>
+            <div style={{ fontSize: 12, color: statusColor, marginTop: 1 }}>
+              {STATUS_LABELS[status] ?? status}
+            </div>
           </div>
-          <div style={{ fontSize: 12, color: statusColor, marginTop: 1 }}>
-            {STATUS_LABELS[status] ?? status}
-          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {showAudioButton && (
+            <button
+              onClick={handleEnableAudio}
+              style={{
+                padding: "7px 18px",
+                borderRadius: theme.radius,
+                border: "1px solid #fbbc04",
+                background: "rgba(251,188,4,0.18)",
+                color: "#fbbc04",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                animation: "pulse 1.5s infinite",
+              }}
+            >
+              🔊 Enable Audio
+            </button>
+          )}
+          {isActive && (
+            <button
+              onClick={handleStop}
+              style={{
+                padding: "8px 22px",
+                borderRadius: theme.radius,
+                border: "none",
+                background: theme.error,
+                color: "white",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              ■ Stop
+            </button>
+          )}
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {showAudioButton && (
-          <button
-            onClick={handleEnableAudio}
-            style={{
-              padding: "7px 16px",
-              borderRadius: theme.radius,
-              border: "1px solid #fbbc04",
-              background: "rgba(251,188,4,0.15)",
-              color: "#fbbc04",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            🔊 Enable Audio
-          </button>
-        )}
-        {isActive && (
-          <button
-            onClick={handleStop}
-            style={{
-              padding: "8px 22px",
-              borderRadius: theme.radius,
-              border: "none",
-              background: theme.error,
-              color: "white",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            ■ Stop
-          </button>
+      {/* Diagnostic strip — always visible so we can see what's happening */}
+      <div
+        style={{
+          borderTop: "1px solid rgba(255,255,255,0.07)",
+          padding: "4px 24px",
+          fontSize: 10,
+          color: "rgba(255,255,255,0.45)",
+          display: "flex",
+          gap: 20,
+          fontFamily: "monospace",
+        }}
+      >
+        <span style={{ color: diag.agentJoined ? "#34a853" : "rgba(255,255,255,0.35)" }}>
+          {diag.agentJoined ? "✔ Agent joined" : "⏳ Waiting for agent"}
+        </span>
+        <span style={{ color: diag.micPublished ? "#34a853" : "rgba(255,255,255,0.35)" }}>
+          {diag.micPublished ? "✔ Mic active" : "⏳ Mic pending"}
+        </span>
+        <span style={{ color: diag.tracksSubscribed > 0 ? "#34a853" : "rgba(255,255,255,0.35)" }}>
+          Audio tracks: {diag.tracksSubscribed}
+        </span>
+        <span style={{ color: audioEnabled ? "#34a853" : "rgba(255,255,255,0.35)" }}>
+          {audioEnabled ? "✔ Audio enabled" : "⚠ Audio not enabled"}
+        </span>
+        {diag.lastError && (
+          <span style={{ color: theme.error }}>Error: {diag.lastError}</span>
         )}
       </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.65; }
+        }
+      `}</style>
     </div>
   );
 }
