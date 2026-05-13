@@ -49,6 +49,7 @@ class RuntimeAgent:
     model: str
     temperature: float
     max_tokens: int
+    language: str
     position_id: UUID | None
     tools: list[RuntimeTool] = field(default_factory=list)
 
@@ -129,6 +130,7 @@ class WorkflowLoader:
                         model=config.get("model") or "gpt-4o-realtime-preview",
                         temperature=float(config.get("temperature") or 0.7),
                         max_tokens=int(config.get("maxTokens") or 1024),
+                        language=config.get("language") or "en",
                         position_id=position_id,
                         tools=tools_by_agent.get(str(agent.id), []),
                     )

@@ -128,6 +128,50 @@ export default function AgentConfigPanel({
         </select>
       </div>
 
+      <div style={{ marginBottom: 14 }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: 11,
+            fontWeight: 500,
+            letterSpacing: "0.6px",
+            textTransform: "uppercase",
+            color: theme.textSecondary,
+            marginBottom: 4,
+          }}
+        >
+          Language
+        </label>
+        <select
+          value={agent.data.language || "en"}
+          onChange={(e) => onChange(agent.id, { language: e.target.value })}
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "8px 10px",
+            fontSize: 13,
+            color: theme.textPrimary,
+            background: theme.surfaceAlt,
+            border: `1.5px solid ${theme.border}`,
+            borderRadius: theme.radius,
+            outline: "none",
+          }}
+        >
+          <option value="en">English</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="it">Italian</option>
+          <option value="pt">Portuguese</option>
+          <option value="hi">Hindi</option>
+          <option value="ja">Japanese</option>
+          <option value="ko">Korean</option>
+          <option value="zh">Chinese (Mandarin)</option>
+          <option value="ar">Arabic</option>
+          <option value="ru">Russian</option>
+        </select>
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <LabeledInput
           label="Temperature"
