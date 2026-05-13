@@ -11,6 +11,8 @@ from app.application.facade.workflow_facade import WorkflowFacade
 from app.application.services.edge_service import EdgeService
 from app.infrastructure.repository.edge import EdgeRepository
 
+from agents.prompts.prompts import WELCOME_MESSAGE as _DEFAULT_WELCOME
+
 _DEFAULT_INSTRUCTIONS = (
     "You are the manager of a call center for an automotive service center. "
     "Help the customer by answering their questions or routing them to the correct department."
@@ -43,6 +45,7 @@ class RuntimeAgent:
     name: str
     is_initial: bool
     instructions: str
+    welcome_message: str
     model: str
     temperature: float
     max_tokens: int
@@ -122,6 +125,7 @@ class WorkflowLoader:
                         name=agent.name,
                         is_initial=bool(agent.isInitial),
                         instructions=config.get("systemPrompt") or _DEFAULT_INSTRUCTIONS,
+                        welcome_message=config.get("welcomeMessage") or _DEFAULT_WELCOME.strip(),
                         model=config.get("model") or "gpt-4o-realtime-preview",
                         temperature=float(config.get("temperature") or 0.7),
                         max_tokens=int(config.get("maxTokens") or 1024),
