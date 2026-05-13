@@ -5,7 +5,6 @@ import {
   createLocalAudioTrack,
   Track,
 } from "livekit-client";
-import { stopWorkflow } from "../../api/workflow";
 import theme from "../../theme";
 
 const STATUS_LABELS = {
@@ -18,10 +17,11 @@ const STATUS_LABELS = {
 export default function VoiceSessionPanel({ workflowId, session, onStop }) {
   const roomRef     = useRef(null);
   const audioEls    = useRef([]);
+  // Guard so onStop() is invoked at most once per session lifecycle
+  const stoppedRef  = useRef(false);
   const [status, setStatus]             = useState("connecting");
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
-  // diagnostic state
   const [diag, setDiag] = useState({
     agentJoined: false,
     tracksSubscribed: 0,
@@ -29,19 +29,41 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     lastError: null,
   });
 
+  // Fire-and-forget stop request when the browser tab is closed/navigated away.
+  // fetch with keepalive is the only reliable mechanism in beforeunload.
+  useEffect(() => {
+    const baseURL = import.meta.env.VITE_APP_BASE_URL || "http://127.0.0.1:8000";
+    const onBeforeUnload = () => {
+      fetch(`${baseURL}/workflows/${workflowId}/stop`, {
+        method: "POST",
+        keepalive: true,
+      });
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [workflowId]);
+
   useEffect(() => {
     let localTrack = null;
     let cancelled  = false;
+    stoppedRef.current = false;
     audioEls.current = [];
 
     const room = new Room();
     roomRef.current = room;
 
+    // Call onStop exactly once — from either the Stop button or an external disconnect.
+    const triggerStop = () => {
+      if (!stoppedRef.current) {
+        stoppedRef.current = true;
+        onStop();
+      }
+    };
+
     room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
       setAudioBlocked(!room.canPlaybackAudio);
     });
 
-    // Track when remote participants (the agent) join
     room.on(RoomEvent.ParticipantConnected, (participant) => {
       console.log("[VoiceSession] Participant connected:", participant.identity);
       setDiag(d => ({ ...d, agentJoined: true }));
@@ -73,8 +95,13 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
       if (audioEls.current.length === 0) setStatus("connected");
     });
 
+    // External disconnect (network drop, agent ends session, server closes room).
+    // cancelled guards against the cleanup path's own room.disconnect() triggering this.
     room.on(RoomEvent.Disconnected, () => {
-      if (!cancelled) setStatus("disconnected");
+      if (!cancelled) {
+        setStatus("disconnected");
+        triggerStop();
+      }
     });
 
     (async () => {
@@ -84,7 +111,6 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         setStatus("connected");
         console.log("[VoiceSession] Connected. Participants:", room.remoteParticipants.size);
 
-        // Check if agent is already in room (joined before us)
         if (room.remoteParticipants.size > 0) {
           setDiag(d => ({ ...d, agentJoined: true }));
         }
@@ -118,14 +144,11 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
 
   const handleEnableAudio = async () => {
     try {
-      // Must be called in user gesture — resumes AudioContext so future
-      // track.attach() el.play() calls succeed automatically
       await roomRef.current?.startAudio();
       setAudioEnabled(true);
       setAudioBlocked(false);
       console.log("[VoiceSession] startAudio() succeeded");
 
-      // Also try to play any elements already attached (agent spoke before click)
       audioEls.current.forEach(({ el }) => {
         el.muted = false;
         el.play().catch(() => {});
@@ -136,10 +159,14 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     }
   };
 
-  const handleStop = async () => {
+  // Stop button inside the panel: disconnect the room, then notify parent.
+  // Parent's onStop calls stopWorkflow + clears sessionState.
+  const handleStop = () => {
     roomRef.current?.disconnect();
-    await stopWorkflow(workflowId);
-    onStop();
+    if (!stoppedRef.current) {
+      stoppedRef.current = true;
+      onStop();
+    }
   };
 
   const isActive   = status !== "disconnected";
@@ -228,7 +255,7 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         </div>
       </div>
 
-      {/* Diagnostic strip — always visible so we can see what's happening */}
+      {/* Diagnostic strip */}
       <div
         style={{
           borderTop: "1px solid rgba(255,255,255,0.07)",

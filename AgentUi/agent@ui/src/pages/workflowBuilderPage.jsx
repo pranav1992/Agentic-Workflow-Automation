@@ -26,7 +26,7 @@ import {
   WorkflowSidebar,
 } from "../components/workflow";
 import VoiceSessionPanel from "../components/workflow/VoiceSessionPanel";
-import { launchWorkflow } from "../api/workflow";
+import { launchWorkflow, stopWorkflow } from "../api/workflow";
 
 function FlowCanvas() {
   const { workflowId: routeWorkflowId } = useParams();
@@ -74,7 +74,14 @@ function FlowCanvas() {
     }
   };
 
-  const handleStop = () => setSessionState(null);
+  const handleStop = async () => {
+    try {
+      await stopWorkflow(workflowId);
+    } catch (e) {
+      console.error("Failed to stop workflow", e);
+    }
+    setSessionState(null);
+  };
 
   return (
     <div
