@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Room,
   RoomEvent,
-  ConnectionState,
   createLocalAudioTrack,
   Track,
 } from "livekit-client";
@@ -103,13 +102,11 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         el.remove();
       });
       audioEls.length = 0;
-      // Skip disconnect only if room never started connecting (e.g. StrictMode
-      // fires cleanup before connect() is even called). Once connecting/connected
-      // we must disconnect or the zombie room leaves a broken WebRTC peer on
-      // the next mount.
-      if (room.state !== ConnectionState.Disconnected) {
-        room.disconnect();
-      }
+      // Always disconnect — connect() changes room state asynchronously so any
+      // conditional check here races and can skip the disconnect, leaving a zombie
+      // room that breaks WebRTC on the next mount. StrictMode "user initiated
+      // disconnect" warnings in dev are expected and harmless.
+      room.disconnect();
     };
   }, [session]);
 
