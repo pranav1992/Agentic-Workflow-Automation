@@ -1,6 +1,28 @@
+import { useState } from "react";
 import DangerButton from "../../../ui/DangerButton";
 import LabeledInput from "../../../ui/LabeledInput";
 import LabeledTextarea from "../../../ui/LabeledTextarea";
+import theme from "../../../theme";
+
+function SectionLabel({ children }) {
+  return (
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "0.8px",
+        textTransform: "uppercase",
+        color: theme.primary,
+        marginBottom: 10,
+        marginTop: 4,
+        paddingBottom: 6,
+        borderBottom: `1px solid ${theme.border}`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function AgentConfigPanel({
   agent,
@@ -10,9 +32,11 @@ export default function AgentConfigPanel({
   onSave = () => {},
   onClose = () => {},
 }) {
+  const [isInitialFocused, setIsInitialFocused] = useState(false);
+
   return (
     <>
-      <h3 style={{ marginTop: 0, marginBottom: 12 }}>Agent Settings</h3>
+      <SectionLabel>Identity</SectionLabel>
 
       <LabeledInput
         label="Agent Name"
@@ -21,94 +45,134 @@ export default function AgentConfigPanel({
         placeholder="Support Bot"
       />
 
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 14,
+          padding: "8px 10px",
+          background: isInitialFocused ? theme.primaryLight : theme.surfaceAlt,
+          borderRadius: theme.radius,
+          border: `1.5px solid ${isInitialFocused ? theme.borderFocus : theme.border}`,
+          cursor: "pointer",
+          transition: "background 0.15s, border-color 0.15s",
+        }}
+        onClick={() => onChange(agent.id, { isInitial: !agent.data.isInitial })}
+        onMouseEnter={() => setIsInitialFocused(true)}
+        onMouseLeave={() => setIsInitialFocused(false)}
+      >
         <input
           id={`initial-${agent.id}`}
           type="checkbox"
           checked={Boolean(agent.data.isInitial)}
           onChange={(e) => onChange(agent.id, { isInitial: e.target.checked })}
-          style={{ marginRight: 8 }}
+          onClick={(e) => e.stopPropagation()}
+          style={{ accentColor: theme.primary, width: 15, height: 15 }}
         />
-        <label htmlFor={`initial-${agent.id}`} style={{ fontSize: 12 }}>
-          Treat as initial entry point
+        <label
+          htmlFor={`initial-${agent.id}`}
+          style={{ fontSize: 13, color: theme.textPrimary, cursor: "pointer", flex: 1 }}
+        >
+          Entry point agent
         </label>
+        {agent.data.isInitial && (
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: theme.primary,
+              background: theme.primaryLight,
+              padding: "2px 7px",
+              borderRadius: 10,
+            }}
+          >
+            ACTIVE
+          </span>
+        )}
       </div>
+
+      <SectionLabel>Model Config</SectionLabel>
 
       <LabeledInput
         label="Model"
         value={agent.data.model || ""}
         onChange={(v) => onChange(agent.id, { model: v })}
-        placeholder="gpt-4"
+        placeholder="gpt-4o-realtime-preview"
       />
 
-      <LabeledInput
-        label="Temperature"
-        type="number"
-        step="0.1"
-        min="0"
-        max="1"
-        value={agent.data.temperature}
-        onChange={(v) => onChange(agent.id, { temperature: parseFloat(v) })}
-      />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <LabeledInput
+          label="Temperature"
+          type="number"
+          step="0.1"
+          min="0"
+          max="1"
+          value={agent.data.temperature}
+          onChange={(v) => onChange(agent.id, { temperature: parseFloat(v) })}
+        />
+        <LabeledInput
+          label="Max Tokens"
+          type="number"
+          min="1"
+          value={agent.data.maxTokens}
+          onChange={(v) => onChange(agent.id, { maxTokens: parseInt(v, 10) || 0 })}
+        />
+      </div>
 
-      <LabeledInput
-        label="Max Tokens"
-        type="number"
-        min="1"
-        value={agent.data.maxTokens}
-        onChange={(v) =>
-          onChange(agent.id, { maxTokens: parseInt(v, 10) || 0 })
-        }
-      />
+      <SectionLabel>Prompt</SectionLabel>
 
       <LabeledTextarea
         label="System Prompt"
         value={agent.data.systemPrompt}
         onChange={(v) => onChange(agent.id, { systemPrompt: v })}
         placeholder="You are a helpful assistant..."
-        rows={5}
+        rows={6}
       />
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 14 }}>
-          <button
-            onClick={onSave}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 8,
-              border: "1px solid #111",
-              background: "#111",
-              color: "white",
-              cursor: "pointer",
-            }}
-          >
-            Save
-          </button>
-          <button
-            onClick={onClose}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 8,
-              border: "1px solid #ddd",
-              background: "white",
-              cursor: "pointer",
-            }}
-          >
-            Close
-          </button>
-        </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          {canDelete ? (
-            <DangerButton
-              label="Delete Agent"
-              onClick={() => onDelete(agent.id)}
-            />
-          ) : (
-            <span style={{ color: "#666", fontSize: 12 }}>
-              Initial agent cannot be deleted.
-            </span>
-          )}
-        </div>
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <button
+          onClick={onSave}
+          style={{
+            flex: 1,
+            padding: "9px 12px",
+            borderRadius: theme.radius,
+            border: "none",
+            background: theme.primary,
+            color: "white",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Save
+        </button>
+        <button
+          onClick={onClose}
+          style={{
+            flex: 1,
+            padding: "9px 12px",
+            borderRadius: theme.radius,
+            border: `1px solid ${theme.border}`,
+            background: theme.surface,
+            color: theme.textPrimary,
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          Close
+        </button>
+      </div>
+
+      <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${theme.border}` }}>
+        {canDelete ? (
+          <DangerButton label="Delete Agent" onClick={() => onDelete(agent.id)} />
+        ) : (
+          <p style={{ fontSize: 12, color: theme.textDisabled, margin: 0, textAlign: "center" }}>
+            Entry point agent cannot be deleted.
+          </p>
+        )}
       </div>
     </>
   );
