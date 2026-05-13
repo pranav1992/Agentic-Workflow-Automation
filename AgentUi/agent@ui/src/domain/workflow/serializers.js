@@ -19,7 +19,9 @@ export function agentSerializer(agentData) {
   };
   const x = serverAtOrigin ? 200 : safe(positionNode?.x, 200);
   const y = serverAtOrigin ? 200 : safe(positionNode?.y, 200);
-  const config = agentData?.node_config?.config ?? {};
+  // API returns field name "config" (not "node_config"); inner dict is "metadata" (serialization_alias)
+  const nodeConfigData = agentData?.node_config ?? agentData?.config;
+  const config = nodeConfigData?.config ?? nodeConfigData?.metadata ?? {};
   return {
     id: String(agentData.id),
     type: "agent",
@@ -29,7 +31,7 @@ export function agentSerializer(agentData) {
       ...config,
       name: agentData.name ?? DEFAULT_AGENT_DATA.name,
       isInitial: Boolean(agentData.isInitial),
-      configId: agentData.node_config?.id ?? null,
+      configId: nodeConfigData?.id ?? null,
       // prefer the related node id; fall back to foreign key on agent
       positionId: positionNode?.id ?? agentData?.position ?? agentData?.position_id,
     },
