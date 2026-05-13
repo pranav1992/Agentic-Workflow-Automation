@@ -8,7 +8,7 @@ from livekit import agents
 from livekit.agents import AutoSubscribe, JobContext, AgentSession
 from livekit.plugins import openai
 
-from agents.prompts.prompts import INSTRUCTIONS, WELCOME_MESSAGE
+from agents.prompts.prompts import INSTRUCTIONS
 from agents.agents.agent import VoiceOrchidAgent
 from agents.runtime.workflow_loader import WorkflowLoader
 from agents.runtime.agent_factory import AgentFactory
@@ -60,7 +60,6 @@ async def entrypoint(ctx: JobContext):
         room=ctx.room,
         agent=VoiceOrchidAgent(instructions=agent_instructions),
     )
-    await session.generate_reply(instructions=WELCOME_MESSAGE)
 
 
 def _parse_workflow_id(metadata: str | None) -> str | None:
