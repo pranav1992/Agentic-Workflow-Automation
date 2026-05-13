@@ -13,6 +13,7 @@ from app.domain.schema import (
     NodeConfigCreate,
     PositionCreate,
 )
+from agents.prompts.prompts import INSTRUCTIONS as _DEFAULT_INSTRUCTIONS
 
 
 class AgentFacade:  
@@ -30,6 +31,8 @@ class AgentFacade:
         config = agent_data.agent_config
         config.agent_id = agent.id  # ensure constraint satisfied
         config.workflow_id = agent.workflow_id
+        if not config.config.get("systemPrompt"):
+            config.config["systemPrompt"] = _DEFAULT_INSTRUCTIONS.strip()
         node_config = self.node_config_service.create(config)
         agent.config = node_config.id
 
@@ -60,7 +63,7 @@ class AgentFacade:
         config = NodeConfigCreate(
             type="agent",
             workflow_id=agent_data.workflow_id,
-            metadata={},
+            metadata={"systemPrompt": _DEFAULT_INSTRUCTIONS.strip()},
             agent_id=agent.id,
         )
 
