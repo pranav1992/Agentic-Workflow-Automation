@@ -16,19 +16,21 @@ const STATUS_LABELS = {
 };
 
 export default function VoiceSessionPanel({ workflowId, session, onStop }) {
-  const roomRef              = useRef(null);
-  const [status, setStatus]  = useState("connecting");
+  const roomRef     = useRef(null);
+  // Stored as ref so handleUnblockAudio can replay them outside the effect closure
+  const audioEls    = useRef([]);  // [{ track, el }]
+  const [status, setStatus]         = useState("connecting");
   const [audioBlocked, setAudioBlocked] = useState(false);
 
   useEffect(() => {
-    let localTrack    = null;
-    let cancelled     = false;
-    const audioEls    = [];      // el elements for cleanup
+    let localTrack = null;
+    let cancelled  = false;
+    audioEls.current = [];
 
     const room = new Room();
     roomRef.current = room;
 
-    // livekit-client 2.x: fires when browser blocks/unblocks audio
+    // livekit fires this when its AudioManager detects playback is blocked/unblocked
     room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
       setAudioBlocked(!room.canPlaybackAudio);
     });
@@ -36,35 +38,32 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     room.on(RoomEvent.TrackSubscribed, (track) => {
       if (track.kind !== Track.Kind.Audio) return;
 
-      // Use raw MediaStreamTrack → HTMLAudioElement to avoid
-      // livekit attach() version quirks and browser autoplay issues
-      const el = new Audio();
-      el.srcObject = new MediaStream([track.mediaStreamTrack]);
-      el.autoplay  = true;
-      el.muted     = false;
-      el.volume    = 1;
+      // track.attach() creates an element livekit's AudioManager knows about,
+      // so room.startAudio() (called from handleUnblockAudio) will play it.
+      const el = track.attach();
+      el.muted  = false;
+      el.volume = 1;
       document.body.appendChild(el);
-      audioEls.push(el);
+      audioEls.current.push({ track, el });
 
+      // Attempt immediate play; browser may block this if there was no recent
+      // user gesture — the AudioPlaybackStatusChanged handler will surface the
+      // "Enable Audio" button in that case.
       el.play().catch(() => setAudioBlocked(true));
       setStatus("agent_speaking");
     });
 
     room.on(RoomEvent.TrackUnsubscribed, (track) => {
       if (track.kind !== Track.Kind.Audio) return;
-      // Pause and remove matching audio element(s)
-      const ms = track.mediaStreamTrack;
-      for (let i = audioEls.length - 1; i >= 0; i--) {
-        const el = audioEls[i];
-        const src = el.srcObject;
-        if (src instanceof MediaStream && src.getTracks().includes(ms)) {
-          el.pause();
-          el.srcObject = null;
-          el.remove();
-          audioEls.splice(i, 1);
-        }
+      const idx = audioEls.current.findIndex(({ track: t }) => t === track);
+      if (idx !== -1) {
+        const { el } = audioEls.current[idx];
+        track.detach(el);
+        el.pause();
+        el.remove();
+        audioEls.current.splice(idx, 1);
       }
-      setStatus("connected");
+      if (audioEls.current.length === 0) setStatus("connected");
     });
 
     room.on(RoomEvent.Disconnected, () => {
@@ -77,15 +76,13 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         if (cancelled) return;
         setStatus("connected");
 
-        // Resume Web Audio context — safe here because we're still in
-        // the microtask chain started by the "Launch" button click
+        // Resume livekit's AudioContext so future track.attach() elements can play
         await room.startAudio();
 
         localTrack = await createLocalAudioTrack();
         if (cancelled) return;
         await room.localParticipant.publishTrack(localTrack);
       } catch (err) {
-        // "Client initiated disconnect" is React StrictMode dev noise — ignore
         if (!cancelled) {
           console.error("LiveKit connection error:", err.message);
           setStatus("disconnected");
@@ -96,22 +93,22 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     return () => {
       cancelled = true;
       localTrack?.stop();
-      audioEls.forEach((el) => {
+      audioEls.current.forEach(({ track, el }) => {
+        track.detach(el);
         el.pause();
-        el.srcObject = null;
         el.remove();
       });
-      audioEls.length = 0;
-      // Always disconnect — connect() changes room state asynchronously so any
-      // conditional check here races and can skip the disconnect, leaving a zombie
-      // room that breaks WebRTC on the next mount. StrictMode "user initiated
-      // disconnect" warnings in dev are expected and harmless.
+      audioEls.current = [];
       room.disconnect();
     };
   }, [session]);
 
   const handleUnblockAudio = async () => {
+    // room.startAudio() resumes livekit's AudioContext AND plays all elements
+    // that were created via track.attach() — this is why we use attach() above.
     await roomRef.current?.startAudio();
+    // Belt-and-suspenders: explicitly replay any element that stalled
+    audioEls.current.forEach(({ el }) => el.play().catch(() => {}));
     setAudioBlocked(false);
   };
 
