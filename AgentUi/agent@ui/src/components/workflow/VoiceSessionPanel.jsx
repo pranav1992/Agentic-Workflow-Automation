@@ -16,39 +16,46 @@ const STATUS_LABELS = {
 };
 
 export default function VoiceSessionPanel({ workflowId, session, onStop }) {
-  const roomRef = useRef(null);
-  const audioRef = useRef(null);
-  const [status, setStatus] = useState("connecting");
+  const roomRef   = useRef(null);
+  const [status, setStatus]           = useState("connecting");
   const [audioBlocked, setAudioBlocked] = useState(false);
 
   useEffect(() => {
     let localTrack = null;
-    let cancelled = false;
+    let cancelled  = false;
+
+    // Track every <audio> element we create so we can clean up
+    const attachedEls = [];
+
     const room = new Room();
     roomRef.current = room;
 
-    // livekit-client 2.x: fires when browser blocks/unblocks audio playback
     room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
       setAudioBlocked(!room.canPlaybackAudio);
     });
 
     room.on(RoomEvent.TrackSubscribed, (track) => {
-      if (track.kind === Track.Kind.Audio) {
-        const el = track.attach();
-        el.autoplay = true;
-        // Append to DOM so the browser can play it
-        document.body.appendChild(el);
-        // Explicitly trigger playback to bypass autoplay policy
-        el.play().catch(() => setAudioBlocked(true));
-        setStatus("agent_speaking");
-      }
+      if (track.kind !== Track.Kind.Audio) return;
+
+      // Let livekit create and wire the element, then force play
+      const el = track.attach();
+      el.setAttribute("playsinline", "");
+      document.body.appendChild(el);
+      attachedEls.push({ track, el });
+
+      el.play().catch(() => setAudioBlocked(true));
+      setStatus("agent_speaking");
     });
 
     room.on(RoomEvent.TrackUnsubscribed, (track) => {
-      if (track.kind === Track.Kind.Audio) {
-        track.detach();
-        setStatus("connected");
+      if (track.kind !== Track.Kind.Audio) return;
+      const idx = attachedEls.findIndex((e) => e.track === track);
+      if (idx !== -1) {
+        const { el } = attachedEls.splice(idx, 1)[0];
+        track.detach(el);
+        el.remove();
       }
+      setStatus("connected");
     });
 
     room.on(RoomEvent.Disconnected, () => {
@@ -61,14 +68,13 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         if (cancelled) return;
         setStatus("connected");
 
-        // Resume audio context — must be called after user interaction (Launch click)
+        // Resume Web Audio context — safe because we're within the Launch button's gesture chain
         await room.startAudio();
 
         localTrack = await createLocalAudioTrack();
         if (cancelled) return;
         await room.localParticipant.publishTrack(localTrack);
       } catch (err) {
-        // "Client initiated disconnect" fires in React StrictMode dev cleanup — safe to ignore.
         if (!cancelled) {
           console.error("LiveKit connection error:", err.message);
           setStatus("disconnected");
@@ -79,8 +85,12 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     return () => {
       cancelled = true;
       localTrack?.stop();
-      // Clean up any audio elements appended to body
-      document.querySelectorAll("audio[data-lk-audio]").forEach((el) => el.remove());
+      // Detach and remove every audio element we created
+      attachedEls.forEach(({ track, el }) => {
+        track.detach(el);
+        el.remove();
+      });
+      attachedEls.length = 0;
       room.disconnect();
     };
   }, [session]);
@@ -96,7 +106,7 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     onStop();
   };
 
-  const isActive = status !== "disconnected";
+  const isActive  = status !== "disconnected";
   const isSpeaking = status === "agent_speaking";
 
   const statusColor = {
@@ -125,9 +135,6 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
         borderTop: "1px solid rgba(255,255,255,0.1)",
       }}
     >
-      {/* Fallback audio element kept for safety */}
-      <audio ref={audioRef} style={{ display: "none" }} />
-
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <SpeakingIndicator active={isSpeaking} />
         <div>
@@ -147,7 +154,7 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
             style={{
               padding: "7px 16px",
               borderRadius: theme.radius,
-              border: `1px solid #fbbc04`,
+              border: "1px solid #fbbc04",
               background: "rgba(251,188,4,0.15)",
               color: "#fbbc04",
               fontSize: 12,
