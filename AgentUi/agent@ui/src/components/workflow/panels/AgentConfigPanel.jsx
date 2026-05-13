@@ -94,12 +94,39 @@ export default function AgentConfigPanel({
 
       <SectionLabel>Model Config</SectionLabel>
 
-      <LabeledInput
-        label="Model"
-        value={agent.data.model || ""}
-        onChange={(v) => onChange(agent.id, { model: v })}
-        placeholder="gpt-4o-realtime-preview"
-      />
+      <div style={{ marginBottom: 14 }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: 11,
+            fontWeight: 500,
+            letterSpacing: "0.6px",
+            textTransform: "uppercase",
+            color: theme.textSecondary,
+            marginBottom: 4,
+          }}
+        >
+          Model
+        </label>
+        <select
+          value={agent.data.model || "gpt-4o-realtime-preview"}
+          onChange={(e) => onChange(agent.id, { model: e.target.value })}
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "8px 10px",
+            fontSize: 13,
+            color: theme.textPrimary,
+            background: theme.surfaceAlt,
+            border: `1.5px solid ${theme.border}`,
+            borderRadius: theme.radius,
+            outline: "none",
+          }}
+        >
+          <option value="gpt-4o-realtime-preview">gpt-4o-realtime-preview</option>
+          <option value="gpt-4o-mini-realtime-preview">gpt-4o-mini-realtime-preview</option>
+        </select>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <LabeledInput
