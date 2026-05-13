@@ -29,6 +29,7 @@ export function agentSerializer(agentData) {
       ...config,
       name: agentData.name ?? DEFAULT_AGENT_DATA.name,
       isInitial: Boolean(agentData.isInitial),
+      configId: agentData.node_config?.id ?? null,
       // prefer the related node id; fall back to foreign key on agent
       positionId: positionNode?.id ?? agentData?.position ?? agentData?.position_id,
     },
