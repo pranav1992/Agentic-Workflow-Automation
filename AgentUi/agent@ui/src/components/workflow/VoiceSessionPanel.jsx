@@ -16,20 +16,20 @@ const STATUS_LABELS = {
 };
 
 export default function VoiceSessionPanel({ workflowId, session, onStop }) {
-  const roomRef   = useRef(null);
-  const [status, setStatus]           = useState("connecting");
+  const roomRef              = useRef(null);
+  const [status, setStatus]  = useState("connecting");
   const [audioBlocked, setAudioBlocked] = useState(false);
 
   useEffect(() => {
-    let localTrack = null;
-    let cancelled  = false;
-
-    // Track every <audio> element we create so we can clean up
-    const attachedEls = [];
+    let localTrack    = null;
+    let cancelled     = false;
+    let didConnect    = false;   // guard against StrictMode pre-connect cleanup
+    const audioEls    = [];      // { el } pairs for cleanup
 
     const room = new Room();
     roomRef.current = room;
 
+    // livekit-client 2.x: fires when browser blocks/unblocks audio
     room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
       setAudioBlocked(!room.canPlaybackAudio);
     });
@@ -37,11 +37,15 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     room.on(RoomEvent.TrackSubscribed, (track) => {
       if (track.kind !== Track.Kind.Audio) return;
 
-      // Let livekit create and wire the element, then force play
-      const el = track.attach();
-      el.setAttribute("playsinline", "");
+      // Use raw MediaStreamTrack → HTMLAudioElement to avoid
+      // livekit attach() version quirks and browser autoplay issues
+      const el = new Audio();
+      el.srcObject = new MediaStream([track.mediaStreamTrack]);
+      el.autoplay  = true;
+      el.muted     = false;
+      el.volume    = 1;
       document.body.appendChild(el);
-      attachedEls.push({ track, el });
+      audioEls.push(el);
 
       el.play().catch(() => setAudioBlocked(true));
       setStatus("agent_speaking");
@@ -49,11 +53,17 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
 
     room.on(RoomEvent.TrackUnsubscribed, (track) => {
       if (track.kind !== Track.Kind.Audio) return;
-      const idx = attachedEls.findIndex((e) => e.track === track);
-      if (idx !== -1) {
-        const { el } = attachedEls.splice(idx, 1)[0];
-        track.detach(el);
-        el.remove();
+      // Pause and remove matching audio element(s)
+      const ms = track.mediaStreamTrack;
+      for (let i = audioEls.length - 1; i >= 0; i--) {
+        const el = audioEls[i];
+        const src = el.srcObject;
+        if (src instanceof MediaStream && src.getTracks().includes(ms)) {
+          el.pause();
+          el.srcObject = null;
+          el.remove();
+          audioEls.splice(i, 1);
+        }
       }
       setStatus("connected");
     });
@@ -66,15 +76,18 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
       try {
         await room.connect(session.livekit_url, session.token);
         if (cancelled) return;
+        didConnect = true;
         setStatus("connected");
 
-        // Resume Web Audio context — safe because we're within the Launch button's gesture chain
+        // Resume Web Audio context — safe here because we're still in
+        // the microtask chain started by the "Launch" button click
         await room.startAudio();
 
         localTrack = await createLocalAudioTrack();
         if (cancelled) return;
         await room.localParticipant.publishTrack(localTrack);
       } catch (err) {
+        // "Client initiated disconnect" is React StrictMode dev noise — ignore
         if (!cancelled) {
           console.error("LiveKit connection error:", err.message);
           setStatus("disconnected");
@@ -85,13 +98,18 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     return () => {
       cancelled = true;
       localTrack?.stop();
-      // Detach and remove every audio element we created
-      attachedEls.forEach(({ track, el }) => {
-        track.detach(el);
+      audioEls.forEach((el) => {
+        el.pause();
+        el.srcObject = null;
         el.remove();
       });
-      attachedEls.length = 0;
-      room.disconnect();
+      audioEls.length = 0;
+      // Only call disconnect if we actually reached the connected state —
+      // avoids the React StrictMode "user initiated disconnect" noise where
+      // cleanup fires before connect() has even resolved
+      if (didConnect) {
+        room.disconnect();
+      }
     };
   }, [session]);
 
@@ -106,7 +124,7 @@ export default function VoiceSessionPanel({ workflowId, session, onStop }) {
     onStop();
   };
 
-  const isActive  = status !== "disconnected";
+  const isActive   = status !== "disconnected";
   const isSpeaking = status === "agent_speaking";
 
   const statusColor = {
