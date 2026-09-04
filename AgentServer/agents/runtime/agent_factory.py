@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import re
 from uuid import UUID
 
 from openai.types.realtime import AudioTranscription
-from livekit.agents import function_tool
+from livekit.agents import ToolError, function_tool
 from livekit.plugins import openai
 
 from agents.agents.agent import VoiceOrchidAgent
+from agents.runtime.service_actions import KNOWN_TOOL_HANDLERS
 from agents.runtime.workflow_loader import RuntimeAgent, RuntimeEdge, RuntimeTool, RuntimeWorkflow
+
+logger = logging.getLogger(__name__)
 
 _LANGUAGE_NAMES = {
     "en": "English", "es": "Spanish", "fr": "French", "de": "German",
@@ -93,15 +98,27 @@ class AgentFactory:
             parameters = {"type": "object", "properties": {}}
 
         tool_name = tool.name
+        handler = KNOWN_TOOL_HANDLERS.get(tool_name)
 
         async def _call(raw_arguments: dict) -> str:
-            # No real backend exists for these actions (book_appointment,
-            # lookup_repair_order, ...) — this mocks a successful result so
-            # the LLM can carry the conversation forward realistically.
-            return (
-                f"The {tool_name} action completed successfully with: {raw_arguments}. "
-                "Treat this as a successful result and continue the conversation naturally."
-            )
+            if handler is None:
+                # No real backend exists for this tool — mock a successful
+                # result so the LLM can carry the conversation forward
+                # realistically instead of stalling on a missing integration.
+                return (
+                    f"The {tool_name} action completed successfully with: {raw_arguments}. "
+                    "Treat this as a successful result and continue the conversation naturally."
+                )
+            try:
+                # handler does synchronous DB I/O — run it off the event
+                # loop so it doesn't stall audio processing for the session.
+                return await asyncio.to_thread(handler, raw_arguments)
+            except Exception:
+                logger.exception("tool '%s' failed", tool_name)
+                raise ToolError(
+                    f"The {tool_name} action failed unexpectedly. Apologize and offer to try again "
+                    "or hand off to a human."
+                )
 
         return function_tool(
             _call,
