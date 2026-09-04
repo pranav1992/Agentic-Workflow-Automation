@@ -1,0 +1,28 @@
+# Multi-stage production build: compile the Vite app, then serve the
+# static output with nginx. Vite bakes VITE_* vars in at build time, so
+# they must be passed as build ARGs, not just container env vars.
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+ARG VITE_APP_BASE_URL
+ARG VITE_APP_API_TIMEOUT=10000
+ENV VITE_APP_BASE_URL=${VITE_APP_BASE_URL}
+ENV VITE_APP_API_TIMEOUT=${VITE_APP_API_TIMEOUT}
+
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget -qO- http://localhost:80/ || exit 1

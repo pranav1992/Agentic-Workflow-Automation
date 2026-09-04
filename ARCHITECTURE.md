@@ -331,17 +331,35 @@ ENABLE_TRACING=true
 
 ### Using Docker Compose (Production)
 ```bash
-# Copy environment template
-cp .env.example .env.local
+# Copy environment template and fill in real secrets
+# (JWT_SECRET_KEY, POSTGRES_PASSWORD, LIVEKIT_*, OPENAI_API_KEY, VITE_APP_BASE_URL)
+cp .env.example .env
+docker compose -f docker-compose.prod.yml --env-file .env build
+docker compose -f docker-compose.prod.yml --env-file .env run --rm api alembic upgrade head
 
-# Start services
-docker-compose -f docker-compose.prod.yml up -d
+# Start services (api, worker, client, postgres, redis)
+docker compose -f docker-compose.prod.yml --env-file .env up -d
 
 # Check health
 curl http://localhost:8000/health
 curl http://localhost:8000/health/ready
 curl http://localhost:8000/health/live
+
+# Confirm the voice worker registered with LiveKit
+docker compose -f docker-compose.prod.yml logs -f worker
 ```
+
+The `api` service only serves the HTTP API — realtime voice sessions require the
+separate `worker` service (`agents/workers/entrypoint.py`), which connects out to
+LiveKit Cloud and joins rooms as they're created. Both `api` and `worker` need
+`LIVEKIT_URL`/`LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET`; only `worker` needs
+`OPENAI_API_KEY`. `JWT_SECRET_KEY` and `POSTGRES_PASSWORD` have no default in
+production compose — the stack refuses to start without them set.
+
+The `client` service builds a static production bundle (Vite build served by
+nginx, `AgentUi/agent@ui/Dockerfile.prod`) rather than running the Vite dev
+server. `VITE_APP_BASE_URL` is baked in at build time, so set it to the API's
+public URL before building — changing it later requires a rebuild.
 
 ### Health Checks
 - `/health` - Basic health check
