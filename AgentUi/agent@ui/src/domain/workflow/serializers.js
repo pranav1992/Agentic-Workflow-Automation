@@ -101,6 +101,7 @@ export function toolSerializer(toolData, { agentId, agentForFallback } = {}) {
         toolData?.positionId ??
         toolData?.position?.id,
       agentId: resolvedAgentId ? String(resolvedAgentId) : undefined,
+      configId: toolData?.config?.id ?? toolData?.tool_config?.id ?? null,
     },
   };
 }
