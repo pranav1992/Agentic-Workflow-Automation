@@ -9,6 +9,7 @@ from app.infrastructure.repository.position_repository import \
     PositionRepository
 from app.domain.schema import ToolPayload
 from app.domain.schema import PositionCreate
+from app.domain.exceptions import InvalidToolDataError
 from app.infrastructure.db.models import Tool
 
 
@@ -20,8 +21,12 @@ class ToolFacade:
         self.session = session
 
     def create_tool(self, tool_data: ToolPayload):
-        # persist Tool row
-        tool = self.tool_service.create(Tool(**tool_data.tool.model_dump()))
+        # persist Tool row (exclude_none so the optional `id` — unset on
+        # create — doesn't override the model's default_factory with a
+        # literal None)
+        tool = self.tool_service.create(
+            Tool(**tool_data.tool.model_dump(exclude_none=True))
+        )
 
         config = tool_data.tool_config
         config.tool_id = tool.id  # ensure constraint satisfied
@@ -48,8 +53,21 @@ class ToolFacade:
     def get_all_tools_by_agent(self, agent_id):
         return self.tool_service.get_all_tools_by_agent(agent_id)
 
-    def update_tool(self, tool):
-        return self.tool_service.update(tool)
+    def update_tool(self, tool_data: ToolPayload):
+        if not tool_data.tool.id:
+            raise InvalidToolDataError("Tool id is required to update a tool")
+
+        # Config first, tool last: both sub-updates commit (and expire the
+        # session) internally, so whichever runs last must be the one whose
+        # freshly-refreshed object we return — otherwise the response comes
+        # back as an empty object once the session re-expires it.
+        config = tool_data.tool_config
+        if getattr(config, "id", None):
+            self.config_service.update(config)
+
+        return self.tool_service.update(
+            Tool(**tool_data.tool.model_dump(exclude_none=True))
+        )
 
     def delete_tool(self, tool_id):
         return self.tool_service.delete(tool_id)
