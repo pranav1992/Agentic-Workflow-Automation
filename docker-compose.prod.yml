@@ -87,6 +87,7 @@ services:
     restart: unless-stopped
     command: ["python", "agents/workers/entrypoint.py", "start"]
     environment:
+      PYTHONPATH: .
       ENVIRONMENT: ${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       POSTGRES_USER: ${POSTGRES_USER:-devuser}
