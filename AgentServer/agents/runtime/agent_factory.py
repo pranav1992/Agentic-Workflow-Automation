@@ -10,6 +10,7 @@ from livekit.agents import ToolError, function_tool
 from livekit.plugins import openai
 
 from agents.agents.agent import VoiceOrchidAgent
+from agents.runtime.http_tool import ToolMisconfigured, call_http_tool
 from agents.runtime.service_actions import KNOWN_TOOL_HANDLERS
 from agents.runtime.workflow_loader import RuntimeAgent, RuntimeEdge, RuntimeTool, RuntimeWorkflow
 
@@ -19,6 +20,13 @@ _LANGUAGE_NAMES = {
     "en": "English", "es": "Spanish", "fr": "French", "de": "German",
     "it": "Italian", "pt": "Portuguese", "hi": "Hindi", "ja": "Japanese",
     "ko": "Korean", "zh": "Chinese (Mandarin)", "ar": "Arabic", "ru": "Russian",
+}
+
+_JSON_SCHEMA_TYPES = {
+    "string": "string",
+    "number": "number",
+    "integer": "integer",
+    "boolean": "boolean",
 }
 
 
@@ -81,44 +89,94 @@ class AgentFactory:
             return registry[initial.id]
         return next(iter(registry.values()))
 
+    def _build_parameters_schema(self, config: dict) -> dict:
+        """Two tool-config shapes exist: the graph editor's HTTP-tool form
+        (pathParams/queryParams/bodyParams, each a list of
+        {name, type, description, required} — see ToolConfigPanel.jsx), and
+        a flat {name: type_hint} dict some tools carry instead. Merge
+        whichever is present into one JSON-schema `parameters` object.
+        """
+        properties: dict = {}
+        required: list[str] = []
+
+        for param_list in (
+            config.get("pathParams"),
+            config.get("queryParams"),
+            config.get("bodyParams"),
+        ):
+            if not isinstance(param_list, list):
+                continue
+            for param in param_list:
+                if not isinstance(param, dict):
+                    continue
+                name = param.get("name")
+                if not name or name in properties:
+                    continue
+                properties[name] = {
+                    "type": _JSON_SCHEMA_TYPES.get(param.get("type"), "string"),
+                    "description": param.get("description") or "",
+                }
+                if param.get("required"):
+                    required.append(name)
+
+        flat_params = config.get("parameters")
+        if isinstance(flat_params, dict):
+            for name, hint in flat_params.items():
+                if name in properties:
+                    continue
+                properties[name] = {"type": "string", "description": str(hint)}
+                required.append(name)
+
+        if not properties:
+            return {"type": "object", "properties": {}}
+        return {"type": "object", "properties": properties, "required": required}
+
     def _build_data_tool(self, tool: RuntimeTool):
-        description = tool.config.get("description") or f"Executes the {tool.name} action."
-        raw_params = tool.config.get("parameters")
-        if isinstance(raw_params, dict) and raw_params:
-            properties = {
-                param_name: {"type": "string", "description": str(param_desc)}
-                for param_name, param_desc in raw_params.items()
-            }
-            parameters: dict = {
-                "type": "object",
-                "properties": properties,
-                "required": list(properties.keys()),
-            }
-        else:
-            parameters = {"type": "object", "properties": {}}
+        config = tool.config
+        description = (
+            config.get("systemPrompt")
+            or config.get("description")
+            or f"Executes the {tool.name} action."
+        )
+        parameters = self._build_parameters_schema(config)
 
         tool_name = tool.name
+        method = tool.method
         handler = KNOWN_TOOL_HANDLERS.get(tool_name)
 
         async def _call(raw_arguments: dict) -> str:
-            if handler is None:
-                # No real backend exists for this tool — mock a successful
-                # result so the LLM can carry the conversation forward
-                # realistically instead of stalling on a missing integration.
-                return (
-                    f"The {tool_name} action completed successfully with: {raw_arguments}. "
-                    "Treat this as a successful result and continue the conversation naturally."
-                )
+            if handler is not None:
+                try:
+                    # handler does synchronous DB I/O — run it off the event
+                    # loop so it doesn't stall audio processing mid-session.
+                    return await asyncio.to_thread(handler, raw_arguments)
+                except Exception:
+                    logger.exception("tool '%s' failed", tool_name)
+                    raise ToolError(
+                        f"The {tool_name} action failed unexpectedly. Apologize and offer to "
+                        "try again or hand off to a human."
+                    )
+
             try:
-                # handler does synchronous DB I/O — run it off the event
-                # loop so it doesn't stall audio processing for the session.
-                return await asyncio.to_thread(handler, raw_arguments)
+                return await call_http_tool(tool_name, method, config, raw_arguments)
+            except ToolMisconfigured:
+                pass  # no baseUrl configured — fall through to the mock below
+            except ToolError:
+                raise
             except Exception:
-                logger.exception("tool '%s' failed", tool_name)
+                logger.exception("HTTP tool '%s' failed", tool_name)
                 raise ToolError(
-                    f"The {tool_name} action failed unexpectedly. Apologize and offer to try again "
-                    "or hand off to a human."
+                    f"The {tool_name} action failed unexpectedly. Apologize and offer to "
+                    "try again or hand off to a human."
                 )
+
+            # No real backend and no endpoint configured — mock a plausible
+            # success so the LLM can carry the conversation forward instead
+            # of stalling on a tool that was never wired up to anything.
+            return (
+                f"The {tool_name} action completed successfully with: {raw_arguments}. "
+                "Treat this as a successful result and continue the conversation naturally."
+            )
 
         return function_tool(
             _call,
