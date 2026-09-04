@@ -10,6 +10,16 @@ services:
     ports:
       - "8000:8000"
 
+  worker:
+    build:
+      context: ./AgentServer
+    command: ["python", "agents/workers/entrypoint.py", "start"]
+    env_file:
+      - AgentServer/.env.docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   client:
     build:
       context: ./AgentUi/agent@ui

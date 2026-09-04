@@ -53,13 +53,16 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       POSTGRES_USER: ${POSTGRES_USER:-devuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: ${POSTGRES_DB:-voiceorchid}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      LIVEKIT_URL: ${LIVEKIT_URL:?LIVEKIT_URL must be set}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}
       MULTI_TENANCY_ENABLED: "true"
       RATE_LIMIT_ENABLED: "true"
       AUDIT_LOG_ENABLED: "true"
@@ -71,8 +74,38 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./AgentServer:/app
+    networks:
+      - voiceorchid-network
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    build:
+      context: ./AgentServer
+      dockerfile: Dockerfile
+    container_name: voiceorchid-worker
+    restart: unless-stopped
+    command: ["python", "agents/workers/entrypoint.py", "start"]
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      POSTGRES_USER: ${POSTGRES_USER:-devuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-voiceorchid}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      LIVEKIT_URL: ${LIVEKIT_URL:?LIVEKIT_URL must be set}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - voiceorchid-network
     security_opt:
@@ -81,13 +114,13 @@ services:
   client:
     build:
       context: ./AgentUi/agent@ui
-      dockerfile: dockerfile
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_APP_BASE_URL: ${VITE_APP_BASE_URL:-http://localhost:8000}
     container_name: voiceorchid-ui
     restart: unless-stopped
-    environment:
-      VITE_API_URL: http://localhost:8000
     ports:
-      - "${CLIENT_PORT:-5173}:5173"
+      - "${CLIENT_PORT:-80}:80"
     depends_on:
       - api
     networks:
