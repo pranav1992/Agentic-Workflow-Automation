@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from app.infrastructure.db.models import NodeType
 
 
@@ -22,11 +22,15 @@ class WorkflowResponse(BaseModel):
 class NodeConfigCreate(BaseModel):
     type: NodeType
     workflow_id: UUID
+    # Accept either "metadata" (the wire contract used everywhere else —
+    # this is what the response models below serialize as) or the bare
+    # field name "config", so a client sending the documented "metadata"
+    # key always actually lands in `.config` instead of silently falling
+    # through to an unused extra attribute.
     config: Dict[str, Any] = Field(
         default_factory=dict,
-        alias="metadata",
+        validation_alias=AliasChoices("metadata", "config"),
         serialization_alias="metadata",
-        validation_alias="config",
     )
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
@@ -35,11 +39,17 @@ class NodeConfigResponse(BaseModel):
     id: UUID
     type: NodeType
     workflow_id: UUID
+    # NOTE: this is populated via from_attributes off the NodeConfig ORM
+    # object, never off a plain dict — so validation_alias must stay
+    # "config" only. Every SQLAlchemy mapped instance carries its own
+    # class-level `.metadata` attribute (the schema registry); adding
+    # "metadata" to this alias makes attribute lookup silently pick up
+    # that unrelated object instead of raising, which serializes into a
+    # ResponseValidationError instead of our actual data.
     config: Dict[str, Any] = Field(
         default_factory=dict,
-        alias="metadata",
-        serialization_alias="metadata",
         validation_alias="config",
+        serialization_alias="metadata",
     )
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
