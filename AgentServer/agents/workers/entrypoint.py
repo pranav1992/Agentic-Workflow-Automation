@@ -35,18 +35,22 @@ async def entrypoint(ctx: JobContext):
     await ctx.wait_for_participant()
 
     initial = _DEFAULT_AGENT
+    runtime_workflow = None
     workflow_id = _parse_workflow_id(ctx.room.metadata)
     if workflow_id:
         try:
-            runtime_workflow = WorkflowLoader().load(workflow_id)
-            loaded = runtime_workflow.initial_agent
+            loaded_workflow = WorkflowLoader().load(workflow_id)
+            loaded = loaded_workflow.initial_agent
             if loaded:
                 initial = loaded
+                runtime_workflow = loaded_workflow
                 logger.info(
-                    "Loaded workflow '%s', starting with agent '%s' (lang=%s)",
+                    "Loaded workflow '%s', starting with agent '%s' (lang=%s, %d agent(s), %d edge(s))",
                     runtime_workflow.name,
                     initial.name,
                     initial.language,
+                    len(runtime_workflow.agents),
+                    len(runtime_workflow.edges),
                 )
             else:
                 logger.warning("Workflow %s has no initial agent — using defaults", workflow_id)
@@ -55,8 +59,13 @@ async def entrypoint(ctx: JobContext):
 
     factory = AgentFactory()
     llm = factory.build_realtime_model(initial)
-    agent = factory.build(initial)
-    agent._welcome_message = initial.welcome_message
+    if runtime_workflow is not None:
+        # Wires up every agent in the graph with handoff + data tools so the
+        # LLM can actually transfer the call and call tools mid-session,
+        # instead of the graph being purely descriptive metadata.
+        agent = await factory.build_graph(runtime_workflow)
+    else:
+        agent = factory.build(initial)
 
     session = AgentSession(llm=llm)
     try:
