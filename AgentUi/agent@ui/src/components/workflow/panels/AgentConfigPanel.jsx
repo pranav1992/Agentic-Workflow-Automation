@@ -109,7 +109,7 @@ export default function AgentConfigPanel({
           Model
         </label>
         <select
-          value={agent.data.model || "gpt-4o-realtime-preview"}
+          value={agent.data.model || "gpt-realtime"}
           onChange={(e) => onChange(agent.id, { model: e.target.value })}
           style={{
             width: "100%",
@@ -123,8 +123,8 @@ export default function AgentConfigPanel({
             outline: "none",
           }}
         >
-          <option value="gpt-4o-realtime-preview">gpt-4o-realtime-preview</option>
-          <option value="gpt-4o-mini-realtime-preview">gpt-4o-mini-realtime-preview</option>
+          <option value="gpt-realtime">gpt-realtime</option>
+          <option value="gpt-realtime-mini">gpt-realtime-mini</option>
         </select>
       </div>
 
