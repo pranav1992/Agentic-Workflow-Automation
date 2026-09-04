@@ -22,10 +22,12 @@ class SessionRepository:
     def get_active(self, workflow_id) -> WorkflowSession | None:
         try:
             return self.session.exec(
-                select(WorkflowSession).where(
+                select(WorkflowSession)
+                .where(
                     WorkflowSession.workflow_id == workflow_id,
                     WorkflowSession.status == "active",
                 )
+                .order_by(WorkflowSession.started_at.desc())
             ).first()
         except OperationalError:
             self.session.rollback()

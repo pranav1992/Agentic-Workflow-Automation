@@ -27,6 +27,16 @@ class SessionService:
         )
 
     async def launch(self, workflow_id: UUID) -> WorkflowLaunchResponse:
+        # Close out any session still marked active for this workflow first.
+        # Without this, launching twice (e.g. a page refresh that missed the
+        # disconnect handler) leaves two "active" rows for the same workflow;
+        # get_active() then returns whichever one the DB feels like, and a
+        # single /stop call can no longer reach the other — it stays "active"
+        # forever even though nothing is actually running.
+        stale = self.repo.get_active(workflow_id)
+        if stale is not None:
+            await self._end_session(stale)
+
         # Generate session ID first so it can be embedded in the room name.
         # Using a unique room name per session guarantees LiveKit always
         # dispatches a fresh worker job — reusing the same name causes the
@@ -71,7 +81,9 @@ class SessionService:
         session = self.repo.get_active(workflow_id)
         if session is None:
             return
+        await self._end_session(session)
 
+    async def _end_session(self, session: WorkflowSession) -> None:
         lk = self._lk_client()
         try:
             await lk.room.delete_room(
