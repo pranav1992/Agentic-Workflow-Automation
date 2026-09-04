@@ -128,6 +128,7 @@ class AgentWithPositionResponse(BaseModel):
 
 
 class ToolCreate(BaseModel):
+    id: Optional[UUID] = None
     name: str
     workflow_id: UUID
     agent_id: UUID

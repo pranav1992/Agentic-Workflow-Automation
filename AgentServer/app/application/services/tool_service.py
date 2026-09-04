@@ -1,4 +1,5 @@
 from app.infrastructure.repository.tool_repository import ToolRepository
+from app.domain.exceptions import InvalidToolDataError
 
 
 class ToolService:
@@ -15,6 +16,8 @@ class ToolService:
         return self.tool_repository.get_all_tools_by_agent(agent_id)
 
     def update(self, tool):
+        if not getattr(tool, "id", None):
+            raise InvalidToolDataError()
         return self.tool_repository.update(tool)
 
     def delete(self, tool_id):

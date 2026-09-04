@@ -47,10 +47,15 @@ class ToolRepository:
             if existing is None:
                 raise ToolNotFoundError(tool.id)
 
-            self.session.merge(tool)
+            # Targeted field update — merge() would null out `position`/
+            # `config` (and any other columns not present on the incoming
+            # transient object), silently unlinking the tool's node
+            # position and its NodeConfig.
+            existing.name = tool.name
+            existing.method = tool.method
             self.session.commit()
-            self.session.refresh(tool)
-            return tool
+            self.session.refresh(existing)
+            return existing
         except OperationalError:
             self.session.rollback()
             raise DatabaseUnavailableError()
