@@ -262,3 +262,52 @@ class WorkflowSession(SQLModel, table=True):
     ended_at: Optional[datetime] = Field(default=None)
     status: str = Field(default="active", max_length=20)  # active | stopped
     workflow: Optional[WorkFlow] = Relationship(back_populates="sessions")
+
+
+# --- Car-service-center demo backend --------------------------------------
+# Real persistence behind the demo workflow's tool calls (book_appointment,
+# lookup_repair_order, get_price_quote, escalate_to_human) — see
+# agents/runtime/service_actions.py. Not part of the generic workflow/tool
+# graph model above; this is domain data for this specific demo's tools.
+
+
+class ServiceAppointment(SQLModel, table=True):
+    __tablename__ = "service_appointment"
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    confirmation_code: str = Field(max_length=12, index=True)
+    vehicle_vin: str = Field(max_length=32)
+    service_type: str = Field(max_length=100)
+    scheduled_date: str = Field(max_length=20)
+    scheduled_time: str = Field(max_length=20)
+    customer_phone: str = Field(max_length=32, default="")
+    status: str = Field(default="scheduled", max_length=20)
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+class RepairOrder(SQLModel, table=True):
+    __tablename__ = "repair_order"
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    order_number: str = Field(max_length=20, unique=True, index=True)
+    vehicle_vin: str = Field(max_length=32, index=True)
+    status: str = Field(max_length=50)
+    description: str = Field(max_length=500)
+    estimated_completion: str = Field(max_length=20, default="")
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+class ServicePricing(SQLModel, table=True):
+    __tablename__ = "service_pricing"
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    service_type: str = Field(max_length=100, unique=True, index=True)
+    price_cents: int
+    description: str = Field(max_length=200, default="")
+
+
+class Escalation(SQLModel, table=True):
+    __tablename__ = "escalation"
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    reason: str = Field(max_length=500, default="")
+    customer_phone: str = Field(max_length=32, default="")
+    location: str = Field(max_length=200, default="")
+    status: str = Field(default="open", max_length=20)
+    created_at: datetime = Field(default_factory=datetime.now)
