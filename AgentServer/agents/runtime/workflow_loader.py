@@ -127,7 +127,7 @@ class WorkflowLoader:
                         is_initial=bool(agent.isInitial),
                         instructions=config.get("systemPrompt") or _DEFAULT_INSTRUCTIONS,
                         welcome_message=config.get("welcomeMessage") or _DEFAULT_WELCOME.strip(),
-                        model=config.get("model") or "gpt-4o-realtime-preview",
+                        model=config.get("model") or "gpt-realtime",
                         temperature=float(config.get("temperature") or 0.7),
                         max_tokens=int(config.get("maxTokens") or 1024),
                         language=config.get("language") or "en",

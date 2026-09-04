@@ -36,7 +36,7 @@ class AgentFacade:
         if not config.config.get("welcomeMessage"):
             config.config["welcomeMessage"] = _DEFAULT_WELCOME.strip()
         if not config.config.get("model"):
-            config.config["model"] = "gpt-4o-realtime-preview"
+            config.config["model"] = "gpt-realtime"
         if config.config.get("temperature") is None:
             config.config["temperature"] = 0.7
         if config.config.get("maxTokens") is None:
@@ -72,7 +72,7 @@ class AgentFacade:
             metadata={
                 "systemPrompt": _DEFAULT_INSTRUCTIONS.strip(),
                 "welcomeMessage": _DEFAULT_WELCOME.strip(),
-                "model": "gpt-4o-realtime-preview",
+                "model": "gpt-realtime",
                 "temperature": 0.7,
                 "maxTokens": 1024,
             },

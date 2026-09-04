@@ -138,7 +138,7 @@ VoiceOrchid/
 | Migrations | Alembic |
 | Caching | Redis 7 |
 | Voice runtime | LiveKit Agents SDK 1.4 |
-| LLM | OpenAI Realtime API (`gpt-4o-realtime-preview`, voice `marin`) |
+| LLM | OpenAI Realtime API (`gpt-realtime`, voice `marin`) |
 | Settings | Pydantic Settings |
 | Server | Uvicorn |
 | Python | 3.12+ |
