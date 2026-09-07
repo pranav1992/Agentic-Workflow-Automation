@@ -74,10 +74,6 @@ class Settings(BaseSettings):
     MULTI_TENANCY_ENABLED: bool = Field(default=True)
     DEFAULT_TENANT_ID: Optional[str] = Field(default=None)
     
-    # Background jobs
-    CELERY_BROKER_URL: str = Field(default="redis://localhost:6379/0")
-    CELERY_RESULT_BACKEND: str = Field(default="redis://localhost:6379/1")
-    
     # LiveKit
     LIVEKIT_URL: Optional[str] = Field(default=None)
     LIVEKIT_API_KEY: Optional[str] = Field(default=None)

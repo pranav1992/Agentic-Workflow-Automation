@@ -17,7 +17,6 @@ Fundamental infrastructure components:
 - **`rate_limiter.py`**: API rate limiting
 - **`feature_flags.py`**: Feature flag management
 - **`pagination.py`**: Standardized pagination utilities
-- **`background_jobs.py`**: Async task infrastructure
 - **`versioning.py`**: API version management
 
 ### 2. **Infrastructure Layer** (`app/infrastructure/`)
@@ -259,30 +258,6 @@ if not has_permission:
     "timestamp": "2024-05-10T10:30:00.000Z"
   }
 }
-```
-
-## Background Jobs
-
-### Registering a Task
-```python
-from app.core.background_jobs import get_task_queue
-
-queue = get_task_queue()
-
-async def process_workflow(payload):
-    # Long-running operation
-    pass
-
-queue.register_task("workflow_execution", process_workflow)
-```
-
-### Enqueueing a Task
-```python
-task = queue.enqueue_task(
-    tenant_id=tenant_id,
-    task_name="workflow_execution",
-    payload={"workflow_id": workflow_id},
-)
 ```
 
 ## Configuration Management
