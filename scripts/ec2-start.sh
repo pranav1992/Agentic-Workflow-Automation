@@ -3,8 +3,10 @@
 # public IP. There's no Elastic IP on this instance (kept off to avoid
 # its cost while stopped), so the IP changes on every start — LIVEKIT_URL
 # is both what the api/worker containers use AND what gets handed to the
-# browser, and VITE_APP_BASE_URL is baked into the client bundle at build
-# time, so both have to be refreshed and the client rebuilt every time.
+# browser, VITE_APP_BASE_URL is baked into the client bundle at build
+# time, and CORS_ORIGINS must list the new origin or the browser's API
+# calls get rejected — all three have to be refreshed every time, and
+# the client rebuilt.
 set -euo pipefail
 
 REGION="${REGION:-ap-south-1}"
@@ -48,12 +50,13 @@ if [ "$ready" != true ]; then
   exit 1
 fi
 
-echo "Re-pointing LIVEKIT_URL / VITE_APP_BASE_URL at $PUBLIC_IP and redeploying..."
+echo "Re-pointing LIVEKIT_URL / VITE_APP_BASE_URL / CORS_ORIGINS at $PUBLIC_IP and redeploying..."
 ssh "${SSH_OPTS[@]}" "$REMOTE_USER@$PUBLIC_IP" "
   set -e
   cd $REMOTE_DIR
   sed -i -E 's|^LIVEKIT_URL=ws://[0-9.]+:7880|LIVEKIT_URL=ws://$PUBLIC_IP:7880|' .env
   sed -i -E 's|^VITE_APP_BASE_URL=http://[0-9.]+:8000|VITE_APP_BASE_URL=http://$PUBLIC_IP:8000|' .env
+  sed -i -E 's|^CORS_ORIGINS=.*|CORS_ORIGINS=[\"http://$PUBLIC_IP\"]|' .env
   sudo docker compose -f docker-compose.prod.yml --env-file .env up -d --force-recreate api worker
   sudo docker compose -f docker-compose.prod.yml --env-file .env build client
   sudo docker compose -f docker-compose.prod.yml --env-file .env up -d --force-recreate client
