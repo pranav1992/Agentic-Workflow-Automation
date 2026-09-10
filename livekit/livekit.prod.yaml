@@ -1,0 +1,17 @@
+# Production self-hosted LiveKit SFU (docker-compose.prod.yml).
+# Keys are supplied via the LIVEKIT_KEYS env var, not here.
+# Runs with network_mode: host, so every port below binds directly on the
+# EC2 host's network interface — no per-port Docker publishing needed.
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  # The host's public IP must be reachable by clients for WebRTC media to
+  # flow; LiveKit auto-detects it via STUN when this is enabled.
+  use_external_ip: true
+turn:
+  enabled: true
+  udp_port: 3478

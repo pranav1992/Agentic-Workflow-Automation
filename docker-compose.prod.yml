@@ -43,6 +43,20 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  livekit:
+    image: livekit/livekit-server:v1.13.6
+    container_name: voiceorchid-livekit
+    restart: unless-stopped
+    # Host networking so WebRTC media (the UDP port range in livekit.prod.yaml)
+    # binds directly on the EC2 host's public interface — required for clients
+    # to actually reach the SFU; Docker's per-port NAT doesn't work for this.
+    network_mode: host
+    command: ["--config", "/etc/livekit.yaml", "--keys", "${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}"]
+    volumes:
+      - ./livekit/livekit.prod.yaml:/etc/livekit.yaml:ro
+    security_opt:
+      - no-new-privileges:true
+
   api:
     build:
       context: ./AgentServer
@@ -60,6 +74,11 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      # Self-hosted LiveKit (the `livekit` service above) is reachable on the
+      # host's network; point this at the EC2 host's public IP/domain (e.g.
+      # ws://<ec2-ip>:7880 or wss://livekit.yourdomain.com) — it must be the
+      # same address both this container and the browser can reach, since
+      # it's handed straight to the browser as the room's connection URL.
       LIVEKIT_URL: ${LIVEKIT_URL:?LIVEKIT_URL must be set}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}
@@ -74,6 +93,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      livekit:
+        condition: service_started
     networks:
       - voiceorchid-network
     security_opt:
@@ -107,6 +128,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      livekit:
+        condition: service_started
     networks:
       - voiceorchid-network
     security_opt:

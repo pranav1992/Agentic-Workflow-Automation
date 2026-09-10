@@ -14,18 +14,19 @@ help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 
-# ── Infrastructure (Postgres + Redis only) ────────────────────
-infra: ## Start Postgres + Redis in Docker
-	docker compose up -d postgres redis
+# ── Infrastructure (Postgres + Redis + LiveKit) ────────────────
+infra: ## Start Postgres + Redis + LiveKit SFU in Docker
+	docker compose up -d postgres redis livekit
 	@echo ""
 	@echo "  Postgres → localhost:5433"
 	@echo "  Redis    → localhost:6379"
+	@echo "  LiveKit  → ws://localhost:7880"
 	@echo ""
 	@echo "  Next: make migrate && make api   (in one terminal)"
 	@echo "        make ui                    (in another terminal)"
 
-infra-down: ## Stop Postgres + Redis
-	docker compose stop postgres redis
+infra-down: ## Stop Postgres + Redis + LiveKit SFU
+	docker compose stop postgres redis livekit
 
 # ── Dependencies ──────────────────────────────────────────────
 install: install-api install-ui ## Install all dependencies

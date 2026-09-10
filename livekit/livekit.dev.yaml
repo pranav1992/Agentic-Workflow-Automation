@@ -1,0 +1,10 @@
+# Local self-hosted LiveKit SFU (used by `make infra` / docker-compose.yml).
+# Keys are supplied via the LIVEKIT_KEYS env var in docker-compose.yml, not here.
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: false

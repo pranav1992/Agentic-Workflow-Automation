@@ -57,5 +57,17 @@ services:
     ports:
       - "6379:6379"
 
+  livekit:
+    image: livekit/livekit-server:v1.13.6
+    container_name: livekit-dev
+    restart: unless-stopped
+    command: ["--config", "/etc/livekit.yaml", "--keys", "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-secret}"]
+    volumes:
+      - ./livekit/livekit.dev.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50100:50000-50100/udp"
+
 volumes:
   postgres_data:
