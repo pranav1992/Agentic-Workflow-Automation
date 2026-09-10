@@ -30,12 +30,6 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE: int = Field(default=3600)
     DB_ECHO: bool = Field(default=False)
     
-    # Redis
-    REDIS_HOST: str = Field(default="localhost")
-    REDIS_PORT: int = Field(default=6379)
-    REDIS_DB: int = Field(default=0)
-    REDIS_PASSWORD: Optional[str] = Field(default=None)
-    
     # Security
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = Field(default="HS256")
@@ -93,13 +87,6 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         """Get database URL"""
         return f"postgresql+psycopg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-    
-    @property
-    def redis_url(self) -> str:
-        """Get Redis URL"""
-        if self.REDIS_PASSWORD:
-            return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
-        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
     
     @property
     def is_production(self) -> bool:

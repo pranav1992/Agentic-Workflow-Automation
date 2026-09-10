@@ -24,25 +24,6 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  redis:
-    image: redis:7-alpine
-    container_name: voiceorchid-redis
-    restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - voiceorchid-network
-    security_opt:
-      - no-new-privileges:true
-
   livekit:
     image: livekit/livekit-server:v1.13.6
     container_name: voiceorchid-livekit
@@ -71,8 +52,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-voiceorchid}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
       # Self-hosted LiveKit (the `livekit` service above) is reachable on the
       # host's network; point this at the EC2 host's public IP/domain (e.g.
@@ -90,8 +69,6 @@ services:
       - "${API_PORT:-8000}:8000"
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
       livekit:
         condition: service_started
@@ -116,8 +93,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-voiceorchid}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
       LIVEKIT_URL: ${LIVEKIT_URL:?LIVEKIT_URL must be set}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}
@@ -125,8 +100,6 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set}
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
       livekit:
         condition: service_started
@@ -154,8 +127,6 @@ services:
 
 volumes:
   postgres_data:
-    driver: local
-  redis_data:
     driver: local
 
 networks:

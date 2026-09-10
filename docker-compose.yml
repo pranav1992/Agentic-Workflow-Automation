@@ -51,12 +51,6 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7
-    container_name: redis-dev
-    ports:
-      - "6379:6379"
-
   livekit:
     image: livekit/livekit-server:v1.13.6
     container_name: livekit-dev

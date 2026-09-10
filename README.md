@@ -49,7 +49,6 @@ The system has two main concerns:
 │  /workflows  /agents  /tools  /edges  /positions         │
 │       │                                                  │
 │  SQLModel ORM  ──►  PostgreSQL (port 5432)               │
-│  Redis cache   ──►  Redis      (port 6379)               │
 └──────────────────────────────────────────────────────────┘
                          ▲
                          │ WorkflowLoader (reads DB at session start)
@@ -91,8 +90,7 @@ VoiceOrchid/
 │   │   │   └── exceptions/       # Domain-level exception types
 │   │   ├── infrastructure/
 │   │   │   ├── db/               # SQLModel engine, session, ORM models
-│   │   │   ├── repository/       # Data-access objects per entity
-│   │   │   └── cache/            # Redis client
+│   │   │   └── repository/       # Data-access objects per entity
 │   │   ├── config.py             # Pydantic settings (reads .env.local)
 │   │   └── main.py               # FastAPI app factory + middleware
 │   ├── agents/
@@ -121,7 +119,7 @@ VoiceOrchid/
 │
 ├── start.sh                      # Dev launcher (all services or individual)
 ├── stop.sh                       # Stop all background services
-├── docker-compose.yml            # Postgres + Redis + api + client
+├── docker-compose.yml            # Postgres + LiveKit + api + client
 └── main.py                       # Root placeholder
 ```
 
@@ -136,7 +134,6 @@ VoiceOrchid/
 | ORM | SQLModel (SQLAlchemy under the hood) |
 | Database | PostgreSQL 15 via psycopg3 |
 | Migrations | Alembic |
-| Caching | Redis 7 |
 | Voice runtime | LiveKit Agents SDK 1.4 |
 | LLM | OpenAI Realtime API (`gpt-realtime`, voice `marin`) |
 | Settings | Pydantic Settings |
@@ -254,7 +251,7 @@ cp AgentServer/.env.local.example AgentServer/.env.local
 Open **four terminals**, one per process:
 
 ```bash
-# Terminal 1 — infrastructure (Postgres + Redis)
+# Terminal 1 — infrastructure (Postgres + LiveKit)
 make infra
 
 # Terminal 2 — install deps + apply migrations + start API
@@ -278,8 +275,8 @@ Run `make help` to see all available targets.
 
 | Target | Description |
 |---|---|
-| `make infra` | Start Postgres + Redis in Docker |
-| `make infra-down` | Stop Postgres + Redis |
+| `make infra` | Start Postgres + LiveKit SFU in Docker |
+| `make infra-down` | Stop Postgres + LiveKit SFU |
 | `make install` | Install all Python + JS dependencies |
 | `make migrate` | Apply pending Alembic migrations |
 | `make migrate-new MSG="…"` | Generate a new migration |
@@ -348,7 +345,7 @@ docker compose up --build
 | FastAPI backend | 8000 |
 | React UI | 5173 |
 | PostgreSQL | 5432 |
-| Redis | 6379 |
+| LiveKit SFU | 7880 |
 
 ---
 
@@ -367,8 +364,6 @@ docker compose up --build
 | `POSTGRES_DB` | PostgreSQL database name |
 | `POSTGRES_HOST` | PostgreSQL host (e.g. `localhost`) |
 | `POSTGRES_PORT` | PostgreSQL port (default `5432`) |
-| `REDIS_HOST` | Redis host (optional) |
-| `REDIS_PORT` | Redis port (optional, default `6379`) |
 
 ### Frontend — `AgentUi/agent@ui/.env`
 
@@ -418,7 +413,7 @@ Router → Facade (multi-service) → Service (business logic) → Repository (D
 - [ ] Hosted demo
 - [ ] Unit and integration test suite + CI pipeline
 - [ ] Workflow versioning and import/export (JSON)
-- [ ] Production deployment guide (cloud Postgres, managed Redis, LiveKit Cloud)
+- [ ] Production deployment guide (cloud Postgres)
 - [ ] Multi-agent handoff routing engine (evaluate edge conditions at runtime)
 - [ ] HTTP tool registration (convert Tool rows → LiveKit function tools)
 - [ ] Authentication and multi-tenant support

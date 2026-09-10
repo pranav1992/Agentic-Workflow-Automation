@@ -26,9 +26,6 @@ Fundamental infrastructure components:
   - `engine.py`: Database engine and session management
   - `session.py`: Database session factory
 
-- **`cache/`**: Caching layer
-  - `redis_client.py`: Redis connection and utilities
-
 - **`repository/`**: Data access layer
   - All repositories implement tenant isolation
 
@@ -277,11 +274,6 @@ POSTGRES_USER=appuser
 POSTGRES_PASSWORD=secure-password
 POSTGRES_DB=voiceorchid
 
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=redis-password
-
 # Security
 JWT_SECRET_KEY=your-secret-key-min-32-chars
 JWT_EXPIRE_MINUTES=30
@@ -312,7 +304,7 @@ cp .env.example .env
 docker compose -f docker-compose.prod.yml --env-file .env build
 docker compose -f docker-compose.prod.yml --env-file .env run --rm api alembic upgrade head
 
-# Start services (api, worker, client, postgres, redis)
+# Start services (api, worker, client, postgres, livekit)
 docker compose -f docker-compose.prod.yml --env-file .env up -d
 
 # Check health
@@ -384,7 +376,6 @@ pytest tests/unit/ -v --cov=app
 - Request latency
 - Error rate
 - Database connection pool usage
-- Redis memory usage
 - Background job queue depth
 - Tenant-specific usage
 
@@ -399,19 +390,13 @@ pytest tests/unit/ -v --cov=app
 1. **Horizontal Scaling**
    - Stateless API instances
    - Shared PostgreSQL database
-   - Shared Redis cache
 
 2. **Database**
    - Connection pooling (PgBouncer)
    - Read replicas for reporting
    - Regular backups
 
-3. **Caching**
-   - Redis cluster for high availability
-   - Tenant-scoped cache keys
-   - TTL management
-
-4. **Load Balancing**
+3. **Load Balancing**
    - Round-robin across API instances
    - Session affinity if needed
    - Health check configuration
