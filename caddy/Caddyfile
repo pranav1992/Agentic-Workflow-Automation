@@ -1,0 +1,21 @@
+# Reverse proxy fronting the app with automatic HTTPS (Let's Encrypt).
+# Hostnames come in as env vars since they're IP-derived (sslip.io) and
+# change every time the EC2 instance restarts without an Elastic IP —
+# see scripts/ec2-start.sh, which rewrites them and force-recreates this
+# container so it re-issues certs for the new names.
+#
+# Browsers only allow microphone access (getUserMedia) on a secure
+# context (https://) — this proxy exists to satisfy that, not for
+# encryption's own sake.
+
+{$APP_HOST} {
+	reverse_proxy 127.0.0.1:{$CLIENT_INTERNAL_PORT}
+}
+
+{$API_HOST} {
+	reverse_proxy 127.0.0.1:{$API_PORT}
+}
+
+{$LIVEKIT_HOST} {
+	reverse_proxy 127.0.0.1:7880
+}

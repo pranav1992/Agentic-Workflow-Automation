@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # Starts the VoiceOrchid EC2 instance and re-points the app at its new
 # public IP. There's no Elastic IP on this instance (kept off to avoid
-# its cost while stopped), so the IP changes on every start — LIVEKIT_URL
-# is both what the api/worker containers use AND what gets handed to the
-# browser, VITE_APP_BASE_URL is baked into the client bundle at build
-# time, and CORS_ORIGINS must list the new origin or the browser's API
-# calls get rejected — all three have to be refreshed every time, and
-# the client rebuilt.
+# its cost while stopped), so the IP changes on every start.
+#
+# The app is served over HTTPS via Caddy on <role>.<dashed-ip>.sslip.io
+# hostnames (sslip.io resolves any subdomain of a dashed IP to that IP,
+# so this needs no real domain) — browsers only allow microphone access
+# on a secure context, so plain http://<ip> can't work. Since the IP
+# changes every start, so do these hostnames, so LIVEKIT_URL,
+# VITE_APP_BASE_URL, CORS_ORIGINS, and Caddy's own APP_HOST/API_HOST/
+# LIVEKIT_HOST all have to be refreshed and the client + Caddy
+# recreated (Caddy re-issues Let's Encrypt certs for the new names
+# automatically on start).
 set -euo pipefail
 
 REGION="${REGION:-ap-south-1}"
@@ -36,6 +41,11 @@ PUBLIC_IP=$(aws ec2 describe-instances --region "$REGION" --instance-ids "$INSTA
   --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
 echo "Public IP: $PUBLIC_IP"
 
+DASHED_IP="${PUBLIC_IP//./-}"
+APP_HOST="app.${DASHED_IP}.sslip.io"
+API_HOST="api.${DASHED_IP}.sslip.io"
+LIVEKIT_HOST="lk.${DASHED_IP}.sslip.io"
+
 echo "Waiting for SSH + Docker to come up..."
 ready=false
 for i in $(seq 1 20); do
@@ -50,20 +60,38 @@ if [ "$ready" != true ]; then
   exit 1
 fi
 
-echo "Re-pointing LIVEKIT_URL / VITE_APP_BASE_URL / CORS_ORIGINS at $PUBLIC_IP and redeploying..."
+echo "Re-pointing at $APP_HOST / $API_HOST / $LIVEKIT_HOST and redeploying..."
 ssh "${SSH_OPTS[@]}" "$REMOTE_USER@$PUBLIC_IP" "
   set -e
   cd $REMOTE_DIR
-  sed -i -E 's|^LIVEKIT_URL=ws://[0-9.]+:7880|LIVEKIT_URL=ws://$PUBLIC_IP:7880|' .env
-  sed -i -E 's|^VITE_APP_BASE_URL=http://[0-9.]+:8000|VITE_APP_BASE_URL=http://$PUBLIC_IP:8000|' .env
-  sed -i -E 's|^CORS_ORIGINS=.*|CORS_ORIGINS=[\"http://$PUBLIC_IP\"]|' .env
+
+  upsert_env() {
+    key=\"\$1\"; value=\"\$2\"
+    if grep -q \"^\${key}=\" .env; then
+      sed -i \"s|^\${key}=.*|\${key}=\${value}|\" .env
+    else
+      echo \"\${key}=\${value}\" >> .env
+    fi
+  }
+
+  upsert_env APP_HOST '$APP_HOST'
+  upsert_env API_HOST '$API_HOST'
+  upsert_env LIVEKIT_HOST '$LIVEKIT_HOST'
+  upsert_env LIVEKIT_URL 'wss://$LIVEKIT_HOST'
+  upsert_env VITE_APP_BASE_URL 'https://$API_HOST'
+  upsert_env CORS_ORIGINS '[\"https://$APP_HOST\"]'
+
   sudo docker compose -f docker-compose.prod.yml --env-file .env up -d --force-recreate api worker
   sudo docker compose -f docker-compose.prod.yml --env-file .env build client
-  sudo docker compose -f docker-compose.prod.yml --env-file .env up -d --force-recreate client
+  sudo docker compose -f docker-compose.prod.yml --env-file .env up -d --force-recreate client caddy
 "
 
 echo ""
+echo "Waiting for Caddy to obtain TLS certificates (first request per host can take ~10-20s)..."
+sleep 15
+
+echo ""
 echo "VoiceOrchid is live:"
-echo "  UI:      http://$PUBLIC_IP"
-echo "  API:     http://$PUBLIC_IP:8000"
-echo "  LiveKit: ws://$PUBLIC_IP:7880"
+echo "  UI:      https://$APP_HOST"
+echo "  API:     https://$API_HOST"
+echo "  LiveKit: wss://$LIVEKIT_HOST"
