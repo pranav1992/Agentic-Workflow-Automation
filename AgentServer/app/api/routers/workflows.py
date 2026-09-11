@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from app.domain.schema import (
     WorkflowCreate,
     WorkflowResponse,
@@ -90,9 +90,14 @@ def get_all_nodes(
 @router.post("/{id}/launch", response_model=WorkflowLaunchResponse)
 async def launch_workflow(
     id: UUID,
+    request: Request,
     session_service: SessionService = Depends(get_session_service),
 ):
-    return await session_service.launch(id)
+    # request.client.host is the real caller because uvicorn runs with
+    # --proxy-headers behind Caddy; without that it would be the proxy's IP
+    # and the per-IP limit would apply to everyone at once.
+    client_ip = request.client.host if request.client else None
+    return await session_service.launch(id, client_ip=client_ip)
 
 
 @router.post("/{id}/stop", status_code=200)

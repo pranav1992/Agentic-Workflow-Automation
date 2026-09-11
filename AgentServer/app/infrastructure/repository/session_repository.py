@@ -33,6 +33,23 @@ class SessionRepository:
             self.session.rollback()
             raise DatabaseUnavailableError()
 
+    def count_active(self) -> int:
+        """Active sessions across all workflows — the concurrency cap is
+        global because the spend and the box's memory are global."""
+        try:
+            return len(
+                list(
+                    self.session.exec(
+                        select(WorkflowSession).where(
+                            WorkflowSession.status == "active"
+                        )
+                    )
+                )
+            )
+        except OperationalError:
+            self.session.rollback()
+            raise DatabaseUnavailableError()
+
     def get_all(self, workflow_id) -> list[WorkflowSession]:
         try:
             return list(
