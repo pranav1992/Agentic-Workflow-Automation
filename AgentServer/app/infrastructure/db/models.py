@@ -261,6 +261,15 @@ class WorkflowSession(SQLModel, table=True):
     started_at: datetime = Field(default_factory=datetime.now)
     ended_at: Optional[datetime] = Field(default=None)
     status: str = Field(default="active", max_length=20)  # active | stopped
+    # Why the call ended — distinguishes a normal hang-up from one we cut off
+    # at the duration cap, or one that died in the worker.
+    ended_reason: Optional[str] = Field(default=None, max_length=40)
+    # Token counts reported by the realtime model, written by the worker when
+    # the job finishes. Without this there is no way to answer "what did last
+    # month cost, and which session caused it" — audio tokens are the spend.
+    usage: Optional[dict] = Field(
+        default=None, sa_column=Column(JSONB, nullable=True)
+    )
     workflow: Optional[WorkFlow] = Relationship(back_populates="sessions")
 
 

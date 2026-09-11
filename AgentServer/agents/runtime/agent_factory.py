@@ -51,6 +51,14 @@ class AgentFactory:
     def build_realtime_model(
         self, runtime_agent: RuntimeAgent
     ) -> openai.realtime.RealtimeModel:
+        kwargs = {}
+        # The builder UI collects temperature per agent; without this it was
+        # stored and then silently ignored. maxTokens is also collected but
+        # this SDK's RealtimeModel exposes no output-token cap, so it still
+        # has no effect — the session duration cap is what bounds spend.
+        if runtime_agent.temperature is not None:
+            kwargs["temperature"] = runtime_agent.temperature
+
         return openai.realtime.RealtimeModel(
             model=runtime_agent.model,
             voice="marin",
@@ -59,6 +67,7 @@ class AgentFactory:
                 model="gpt-4o-transcribe",
                 language=runtime_agent.language or "en",
             ),
+            **kwargs,
         )
 
     async def build_graph(self, workflow: RuntimeWorkflow) -> VoiceOrchidAgent:
