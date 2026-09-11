@@ -65,6 +65,17 @@ services:
       # on (APP_HOST below), or the browser gets CORS errors on every
       # API call.
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set}
+      # Shared secret gating every mutating endpoint. Required: the guard
+      # fails closed, so without it the builder is read-only rather than
+      # silently open to the internet.
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?ADMIN_API_TOKEN must be set}
+      # Spend caps for the public demo. MAX_SESSION_SECONDS is passed to the
+      # worker too — both must agree or the API's token TTL and the worker's
+      # wall-clock cap drift apart.
+      MAX_CONCURRENT_SESSIONS: ${MAX_CONCURRENT_SESSIONS:-2}
+      MAX_SESSION_SECONDS: ${MAX_SESSION_SECONDS:-300}
+      LAUNCH_LIMIT_PER_IP: ${LAUNCH_LIMIT_PER_IP:-5}
+      LAUNCH_LIMIT_WINDOW_SECONDS: ${LAUNCH_LIMIT_WINDOW_SECONDS:-600}
       MULTI_TENANCY_ENABLED: "true"
       RATE_LIMIT_ENABLED: "true"
       AUDIT_LOG_ENABLED: "true"
@@ -105,6 +116,9 @@ services:
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set}
+      # Hard wall-clock ceiling the worker enforces on a single call; the only
+      # thing stopping an abandoned-but-connected tab billing indefinitely.
+      MAX_SESSION_SECONDS: ${MAX_SESSION_SECONDS:-300}
     depends_on:
       postgres:
         condition: service_healthy
