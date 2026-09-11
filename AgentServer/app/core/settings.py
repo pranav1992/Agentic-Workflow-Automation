@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     
     # Security
     JWT_SECRET_KEY: str
+    # Shared secret guarding every mutating endpoint (workflow/agent/tool/edge/
+    # position writes). Sent by the builder UI as an X-Admin-Token header.
+    # Reads and the public voice demo deliberately stay open; see
+    # app/api/dependencies/auth.py.
+    ADMIN_API_TOKEN: Optional[str] = Field(default=None)
     JWT_ALGORITHM: str = Field(default="HS256")
     JWT_EXPIRE_MINUTES: int = Field(default=30)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30)
@@ -72,6 +77,21 @@ class Settings(BaseSettings):
     LIVEKIT_URL: Optional[str] = Field(default=None)
     LIVEKIT_API_KEY: Optional[str] = Field(default=None)
     LIVEKIT_API_SECRET: Optional[str] = Field(default=None)
+
+    # Voice session spend/abuse caps. The demo launch endpoint is public, so
+    # these are the only thing bounding what an anonymous caller can cost:
+    # every session is a live OpenAI Realtime audio stream billed per second.
+    MAX_CONCURRENT_SESSIONS: int = Field(default=2)
+    MAX_SESSION_SECONDS: int = Field(default=300)
+    LAUNCH_LIMIT_PER_IP: int = Field(default=5)
+    LAUNCH_LIMIT_WINDOW_SECONDS: int = Field(default=600)
+    # Token lives slightly longer than a capped session so a mid-session
+    # reconnect still works, but nowhere near the SDK's ~6h default.
+    LIVEKIT_TOKEN_TTL_SECONDS: int = Field(default=420)
+    # Server-side backstop for rooms the browser never cleans up (tab crash,
+    # mobile backgrounding) — LiveKit closes them itself.
+    ROOM_EMPTY_TIMEOUT_SECONDS: int = Field(default=60)
+    ROOM_DEPARTURE_TIMEOUT_SECONDS: int = Field(default=20)
     
     # OpenAI
     OPENAI_API_KEY: Optional[str] = Field(default=None)

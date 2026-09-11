@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from app.application.facade.tool_facade import ToolFacade
 from app.application.services.tool_service import ToolService
 from app.api.dependencies.services import get_tool_facade, get_tool_service
+from app.api.dependencies.auth import require_admin
 from app.domain.schema import ToolPayload, ToolWithPositionResponse
 
 
@@ -24,13 +25,14 @@ async def get_all_tools_by_agent(
     return tool_service.get_all_tools_by_agent(agent_id)
 
 
-@router.post("/", response_model=ToolWithPositionResponse)
+@router.post("/", response_model=ToolWithPositionResponse,
+             dependencies=[Depends(require_admin)])
 async def create_tool(tool_data: ToolPayload, tool_facade:
                       ToolFacade = Depends(get_tool_facade)):
     return tool_facade.create_tool(tool_data)
 
 
-@router.put("/")
+@router.put("/", dependencies=[Depends(require_admin)])
 async def update_tool(
     tool: ToolPayload,
     tool_facade: ToolFacade = Depends(get_tool_facade),
@@ -38,7 +40,7 @@ async def update_tool(
     return tool_facade.update_tool(tool)
 
 
-@router.delete("/{tool_id}")
+@router.delete("/{tool_id}", dependencies=[Depends(require_admin)])
 async def delete_tool(tool_id, tool_facade: ToolFacade = Depends(
                                                         get_tool_facade)):
     return tool_facade.delete_tool(tool_id)

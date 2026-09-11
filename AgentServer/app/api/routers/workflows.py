@@ -18,6 +18,7 @@ from app.api.dependencies.services import (
     get_workflow_facade,
     get_session_service,
 )
+from app.api.dependencies.auth import require_admin
 
 
 router = APIRouter(
@@ -26,7 +27,8 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=WorkflowResponse)
+@router.post("/", response_model=WorkflowResponse,
+             dependencies=[Depends(require_admin)])
 def create_workflow(workflow: WorkflowCreate, workflowFacade:
                     WorkflowFacade = Depends(get_workflow_facade)):
     return workflowFacade.create_workflow_with_initial_agent(workflow)
@@ -50,13 +52,15 @@ def get_workflow_by_name(name, workflow_service: WorkflowService = Depends(
     return workflow_service.get_workflow_by_name(name)
 
 
-@router.delete("/delete/{id}", response_model=WorkflowResponse)
+@router.delete("/delete/{id}", response_model=WorkflowResponse,
+               dependencies=[Depends(require_admin)])
 def delete_workflow(id, workflow_facade: WorkflowFacade = Depends(
                                                     get_workflow_facade)):
     return workflow_facade.delete_workflow(id)
 
 
-@router.put("/update/{id}", response_model=WorkflowResponse)
+@router.put("/update/{id}", response_model=WorkflowResponse,
+            dependencies=[Depends(require_admin)])
 def update_workflow(id, workflow: WorkflowCreate,
                     workflow_service: WorkflowService = Depends(
                                                     get_workflow_service)):
@@ -108,7 +112,8 @@ def workflow_status(
     return session_service.get_status(id)
 
 
-@router.get("/{id}/sessions", response_model=list[WorkflowSessionResponse])
+@router.get("/{id}/sessions", response_model=list[WorkflowSessionResponse],
+            dependencies=[Depends(require_admin)])
 def workflow_sessions(
     id: UUID,
     session_service: SessionService = Depends(get_session_service),

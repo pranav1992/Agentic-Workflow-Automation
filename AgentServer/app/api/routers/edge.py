@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies.services import get_edge_service
+from app.api.dependencies.auth import require_admin
 from app.application.services.edge_service import EdgeService
 from app.domain.schema import EdgeCreate, EdgeResponse
 
@@ -10,7 +11,8 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=EdgeResponse)
+@router.post("/", response_model=EdgeResponse,
+             dependencies=[Depends(require_admin)])
 async def create_edge(
     edge: EdgeCreate, edge_service: EdgeService = Depends(get_edge_service)
 ):
@@ -24,14 +26,15 @@ async def get_edges(
     return edge_service.get_all(workflow_id)
 
 
-@router.delete("/{edge_id}")
+@router.delete("/{edge_id}", dependencies=[Depends(require_admin)])
 async def delete_edge(
     edge_id, edge_service: EdgeService = Depends(get_edge_service)
 ):
     return edge_service.delete(edge_id)
 
 
-@router.put("/", response_model=EdgeResponse)
+@router.put("/", response_model=EdgeResponse,
+            dependencies=[Depends(require_admin)])
 async def update_edge(
     edge: EdgeCreate, edge_service: EdgeService = Depends(get_edge_service)
 ):
