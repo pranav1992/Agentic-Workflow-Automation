@@ -1,7 +1,7 @@
 import { apiClient } from "./client";
 
 export const createTool = async (payload) => {
-  const { data } = await apiClient.post("/tools", payload);
+  const { data } = await apiClient.post("/tools/", payload);
   return data;
 };
 

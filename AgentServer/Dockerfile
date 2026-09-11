@@ -30,5 +30,13 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Start FastAPI server
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers trusts X-Forwarded-Proto from a reverse proxy (Caddy in
+# prod) so redirects Starlette generates (e.g. trailing-slash redirects)
+# come back as https:// instead of the plain-http scheme uvicorn sees on
+# its own connection — otherwise browsers block them as mixed content.
+# --forwarded-allow-ips=* is safe here: this port is published to the
+# host's loopback only (127.0.0.1:8000, see docker-compose.prod.yml),
+# never reachable directly from outside the host, and the docker bridge
+# masks the proxy's real source IP anyway so a fixed allow-list won't
+# reliably match it.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]

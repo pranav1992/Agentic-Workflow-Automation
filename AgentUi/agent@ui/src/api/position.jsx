@@ -1,8 +1,8 @@
 import { apiClient } from "./client";
 
-// Backend expects the position payload (including id) at /positions
+// Backend expects the position payload (including id) at /positions/
 export const updatePosition = async (payload) => {
-  const { data } = await apiClient.put(`/positions`, payload);
+  const { data } = await apiClient.put(`/positions/`, payload);
   return data;
 };
 

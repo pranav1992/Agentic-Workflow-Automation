@@ -2,12 +2,12 @@ import { apiClient } from "./client";
 
 
 export const createEdge = async (payload) => {
-    const { data } = await apiClient.post("/edges", payload);
+    const { data } = await apiClient.post("/edges/", payload);
     return data;
 };
 
 export const updateEdge = async (payload) => {
-    const { data } = await apiClient.put("/edges", payload);
+    const { data } = await apiClient.put("/edges/", payload);
     return data;
 };
 
