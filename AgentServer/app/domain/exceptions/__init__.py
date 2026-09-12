@@ -18,7 +18,11 @@ from .tool import (
     InvalidToolDataError,
 )
 from .edge import InvalidEdgeDataError, EdgeNotFoundError
-from .system import DatabaseUnavailableError, SystemConfigurationError
+from .system import (
+    DatabaseUnavailableError,
+    SystemConfigurationError,
+    TenantRequiredError,
+)
 
 __all__ = [
     "AgentAlreadyInitializedError",
@@ -30,6 +34,7 @@ __all__ = [
     "DuplicateWorkflowError",
     "InvalidAgentDataError",
     "SystemConfigurationError",
+    "TenantRequiredError",
     "WorkflowNotFoundError",
     "ToolNameAlreadyExist",
     "ToolNotFoundError",

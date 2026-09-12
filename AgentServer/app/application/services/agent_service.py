@@ -1,6 +1,7 @@
 from app.infrastructure.repository.agent_repository import AgentRepository
 from app.infrastructure.db.models import Agent
 from app.domain.schema import InititialAgent, AgentCreate
+from app.core.tenancy import TenantContext
 from app.domain.exceptions import (
                                 InvalidAgentDataError,
                                 AgentAlreadyInitializedError,
@@ -13,7 +14,10 @@ class AgentService:
 
     def create(self, agent: AgentCreate):
         try:
-            agent = Agent(**agent.model_dump(exclude_none=True))
+            agent = Agent(
+                **agent.model_dump(exclude_none=True),
+                tenant_id=TenantContext.require_tenant_id(),
+            )
         except Exception:
             raise InvalidAgentDataError()
         if self.agent_repository.isNameAlreadyExist(agent.name, agent.workflow_id):
@@ -27,11 +31,10 @@ class AgentService:
             data = Agent(id=agent.id, name=agent.name, workflow_id=agent.workflow_id, isInitial=agent.isInitial)
         except Exception:
             raise InvalidAgentDataError()
-        return self.agent_repository.update(data)
+        return self.agent_repository.update(data, TenantContext.require_tenant_id())
 
     def delete(self, agent_id):
-
-        return self.agent_repository.delete(agent_id)
+        return self.agent_repository.delete(agent_id, TenantContext.require_tenant_id())
 
     def initialize(self, workflow_id, position_id):
         try:
@@ -41,7 +44,9 @@ class AgentService:
                 position=position_id,
                 isInitial=True,
             )
-            agent = Agent(**payload.model_dump())
+            agent = Agent(
+                **payload.model_dump(), tenant_id=TenantContext.require_tenant_id()
+            )
             if not agent.isInitial:
                 raise InvalidAgentDataError()
             already_exist = self.agent_repository.isInitialized(
@@ -53,7 +58,11 @@ class AgentService:
         return self.agent_repository.initialize(agent)
 
     def get_all_agents(self, workflow_id):
-        return self.agent_repository.get_all_agents(workflow_id)
+        return self.agent_repository.get_all_agents(
+            workflow_id, TenantContext.require_tenant_id()
+        )
 
     def get_agent(self, agent_id):
-        return self.agent_repository.get_agent(agent_id)
+        return self.agent_repository.get_agent(
+            agent_id, TenantContext.require_tenant_id()
+        )

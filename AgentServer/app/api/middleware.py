@@ -26,17 +26,22 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _bearer_subject(request: Request) -> str | None:
-    """Best-effort JWT `sub` claim, so rate limits key on the actual user
-    rather than a shared IP once someone's signed in. Never raises — an
-    invalid/expired token here just falls back to IP-based limiting; the
-    real auth check happens in the route dependencies.
+def _decode_bearer_token(authorization: str | None) -> dict | None:
+    """Best-effort JWT payload decode. Never raises — an invalid/expired
+    token here just falls back to IP-based limiting or no tenant context;
+    the real auth check happens in the route dependencies
+    (app/api/dependencies/auth.py:get_current_user).
     """
-    authorization = request.headers.get("Authorization")
     if not authorization or not authorization.lower().startswith("bearer "):
         return None
     token = authorization.split(" ", 1)[1].strip()
-    payload = get_jwt_manager().decode_token(token)
+    return get_jwt_manager().decode_token(token)
+
+
+def _bearer_subject(request: Request) -> str | None:
+    """JWT `sub` claim, so rate limits key on the actual user rather than
+    a shared IP once someone's signed in."""
+    payload = _decode_bearer_token(request.headers.get("Authorization"))
     return payload.get("sub") if payload else None
 
 
@@ -120,15 +125,24 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 
 class TenantIsolationMiddleware(BaseHTTPMiddleware):
-    """Middleware to enforce tenant isolation"""
-    
+    """Populates TenantContext from the caller's verified JWT.
+
+    This used to trust a client-supplied `X-Tenant-ID` header — anyone
+    could set that to any value and have requests treated as belonging to
+    a different tenant. The tenant a request acts as must come from the
+    signed token, never from something the client can set directly.
+    """
+
     async def dispatch(self, request: Request, call_next):
-        # Extract tenant ID from header or path
-        tenant_id = request.headers.get("X-Tenant-ID")
-        
-        if tenant_id and tenant_id != "":
-            TenantContext.set_tenant_id(tenant_id)
-        
+        payload = _decode_bearer_token(request.headers.get("Authorization"))
+        raw_tenant_id = payload.get("tenant_id") if payload else None
+
+        if raw_tenant_id:
+            try:
+                TenantContext.set_tenant_id(uuid.UUID(raw_tenant_id))
+            except ValueError:
+                pass
+
         response = await call_next(request)
         return response
 

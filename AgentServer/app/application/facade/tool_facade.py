@@ -11,6 +11,7 @@ from app.domain.schema import ToolPayload
 from app.domain.schema import PositionCreate
 from app.domain.exceptions import InvalidToolDataError
 from app.infrastructure.db.models import Tool
+from app.core.tenancy import TenantContext
 
 
 class ToolFacade:
@@ -25,7 +26,10 @@ class ToolFacade:
         # create — doesn't override the model's default_factory with a
         # literal None)
         tool = self.tool_service.create(
-            Tool(**tool_data.tool.model_dump(exclude_none=True))
+            Tool(
+                **tool_data.tool.model_dump(exclude_none=True),
+                tenant_id=TenantContext.require_tenant_id(),
+            )
         )
 
         config = tool_data.tool_config

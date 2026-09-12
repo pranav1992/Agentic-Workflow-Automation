@@ -42,10 +42,10 @@ class AgentRepository:
             self.session.rollback()
             raise DatabaseUnavailableError()
 
-    def update(self, agent):
+    def update(self, agent, tenant_id):
         try:
             existing = self.session.get(Agent, agent.id)
-            if existing is None:
+            if existing is None or existing.tenant_id != tenant_id:
                 raise AgentNotFoundError(agent.id)
 
             existing.name = agent.name
@@ -58,7 +58,7 @@ class AgentRepository:
             self.session.rollback()
             raise DatabaseUnavailableError()
 
-    def get_agent(self, agent_id):
+    def get_agent(self, agent_id, tenant_id):
         stmt = (
             select(Agent)
             .where(Agent.id == agent_id)
@@ -71,7 +71,10 @@ class AgentRepository:
             self.session.rollback()
             raise DatabaseUnavailableError()
 
-        if agent is None:
+        # Same 404 whether the row doesn't exist or belongs to another
+        # tenant — distinguishing the two would let a caller enumerate
+        # other tenants' agent IDs.
+        if agent is None or agent.tenant_id != tenant_id:
             raise AgentNotFoundError(agent_id)
 
         return agent
@@ -89,13 +92,16 @@ class AgentRepository:
             self.session.rollback()
             raise DatabaseUnavailableError()
 
-    def get_all_agents(self, workflow_id):
+    def get_all_agents(self, workflow_id, tenant_id):
         """Return all agents for a workflow with their
             PositionNode eagerly loaded."""
 
         stmt = (
             select(Agent)
-            .where(Agent.workflow_id == workflow_id)
+            .where(
+                Agent.workflow_id == workflow_id,
+                Agent.tenant_id == tenant_id,
+            )
             .options(selectinload(Agent.node_config), selectinload(
                 Agent.position_node))
         )
@@ -107,10 +113,10 @@ class AgentRepository:
             self.session.rollback()
             raise DatabaseUnavailableError()
 
-    def delete(self, agent_id):
+    def delete(self, agent_id, tenant_id):
         try:
             agent = self.session.get(Agent, agent_id)
-            if agent is None:
+            if agent is None or agent.tenant_id != tenant_id:
                 raise AgentNotFoundError(agent_id)
 
             position_id = agent.position

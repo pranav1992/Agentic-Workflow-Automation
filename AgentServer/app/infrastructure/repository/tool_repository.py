@@ -22,9 +22,12 @@ class ToolRepository:
             self.session.rollback()
             raise DatabaseUnavailableError()
 
-    def get_all_tools(self, workflow_id):
+    def get_all_tools(self, workflow_id, tenant_id):
         try:
-            stmt = select(Tool).where(Tool.workflow_id == workflow_id).options(
+            stmt = select(Tool).where(
+                Tool.workflow_id == workflow_id,
+                Tool.tenant_id == tenant_id,
+            ).options(
                 joinedload(Tool.position_node), selectinload(Tool.node_config)
             )
             return self.session.exec(stmt).all()
@@ -32,19 +35,22 @@ class ToolRepository:
             self.session.rollback()
             raise DatabaseUnavailableError()
 
-    def get_all_tools_by_agent(self, agent_id):
+    def get_all_tools_by_agent(self, agent_id, tenant_id):
         try:
-            stmt = select(Tool).where(Tool.agent_id == agent_id).options(
+            stmt = select(Tool).where(
+                Tool.agent_id == agent_id,
+                Tool.tenant_id == tenant_id,
+            ).options(
                 joinedload(Tool.position_node), selectinload(Tool.node_config))
             return self.session.exec(stmt).all()
         except OperationalError:
             self.session.rollback()
             raise DatabaseUnavailableError()
 
-    def update(self, tool):
+    def update(self, tool, tenant_id):
         try:
             existing = self.session.get(Tool, tool.id)
-            if existing is None:
+            if existing is None or existing.tenant_id != tenant_id:
                 raise ToolNotFoundError(tool.id)
 
             # Targeted field update — merge() would null out `position`/
@@ -60,10 +66,10 @@ class ToolRepository:
             self.session.rollback()
             raise DatabaseUnavailableError()
 
-    def delete(self, tool_id):
+    def delete(self, tool_id, tenant_id):
         try:
             tool = self.session.get(Tool, tool_id)
-            if tool is None:
+            if tool is None or tool.tenant_id != tenant_id:
                 raise ToolNotFoundError(tool_id)
 
             position_id = tool.position
@@ -96,9 +102,10 @@ class ToolRepository:
             self.session.rollback()
             raise DatabaseUnavailableError()
 
-    def get(self, tool_id):
+    def get(self, tool_id, tenant_id):
         try:
-            return self.session.get(Tool, tool_id)
+            tool = self.session.get(Tool, tool_id)
+            return tool if tool and tool.tenant_id == tenant_id else None
         except OperationalError:
             self.session.rollback()
             raise DatabaseUnavailableError()

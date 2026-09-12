@@ -59,3 +59,19 @@ class TenantContext:
             "user_id": _user_id_ctx.get(),
             "request_id": _request_id_ctx.get(),
         }
+
+    @staticmethod
+    def require_tenant_id() -> UUID:
+        """Like get_tenant_id(), but raises if there isn't one.
+
+        Every route that reaches a tenant-scoped service runs behind
+        get_current_user, whose JWT always carries a tenant_id — this
+        should only ever be None if that invariant broke (e.g.
+        TenantIsolationMiddleware not registered), not because the caller
+        is merely unauthenticated.
+        """
+        tenant_id = _tenant_id_ctx.get()
+        if tenant_id is None:
+            from app.domain.exceptions import TenantRequiredError
+            raise TenantRequiredError()
+        return tenant_id

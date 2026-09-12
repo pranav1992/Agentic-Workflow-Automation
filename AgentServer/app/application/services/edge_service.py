@@ -2,6 +2,7 @@ from app.infrastructure.repository.edge import EdgeRepository
 from app.infrastructure.db.models import Edge
 from app.domain.schema import EdgeCreate
 from app.domain.exceptions.edge import InvalidEdgeDataError
+from app.core.tenancy import TenantContext
 
 
 class EdgeService:
@@ -10,22 +11,26 @@ class EdgeService:
 
     def create(self, edge_data: EdgeCreate):
         try:
-            edge = Edge(**edge_data.model_dump(exclude_none=True))
+            edge = Edge(
+                **edge_data.model_dump(exclude_none=True),
+                tenant_id=TenantContext.require_tenant_id(),
+            )
         except Exception:
             raise InvalidEdgeDataError()
         return self.edge_repository.create(edge)
 
     def delete(self, edge_id):
-        return self.edge_repository.delete(edge_id)
+        return self.edge_repository.delete(edge_id, TenantContext.require_tenant_id())
 
     def get_all(self, workflow_id):
+        tenant_id = TenantContext.require_tenant_id()
         # prefer new get_all; fall back if older method exists
         if hasattr(self.edge_repository, "get_all"):
-            return self.edge_repository.get_all(workflow_id)
-        return self.edge_repository.get_all_edges_by_workflow(workflow_id)
+            return self.edge_repository.get_all(workflow_id, tenant_id)
+        return self.edge_repository.get_all_edges_by_workflow(workflow_id, tenant_id)
 
     def get(self, edge_id):
-        return self.edge_repository.get(edge_id)
+        return self.edge_repository.get(edge_id, TenantContext.require_tenant_id())
 
     def update(self, edge):
         # edge arrives as EdgeCreate schema
@@ -33,4 +38,4 @@ class EdgeService:
             edge_model = Edge(**edge.model_dump(exclude_none=True))
         except Exception:
             raise InvalidEdgeDataError()
-        return self.edge_repository.update(edge_model)
+        return self.edge_repository.update(edge_model, TenantContext.require_tenant_id())

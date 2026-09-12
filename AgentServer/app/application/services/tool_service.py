@@ -1,5 +1,6 @@
 from app.infrastructure.repository.tool_repository import ToolRepository
 from app.domain.exceptions import InvalidToolDataError
+from app.core.tenancy import TenantContext
 
 
 class ToolService:
@@ -10,18 +11,22 @@ class ToolService:
         return self.tool_repository.create(tool)
 
     def get_all_tools(self, workflow_id):
-        return self.tool_repository.get_all_tools(workflow_id)
+        return self.tool_repository.get_all_tools(
+            workflow_id, TenantContext.require_tenant_id()
+        )
 
     def get_all_tools_by_agent(self, agent_id):
-        return self.tool_repository.get_all_tools_by_agent(agent_id)
+        return self.tool_repository.get_all_tools_by_agent(
+            agent_id, TenantContext.require_tenant_id()
+        )
 
     def update(self, tool):
         if not getattr(tool, "id", None):
             raise InvalidToolDataError()
-        return self.tool_repository.update(tool)
+        return self.tool_repository.update(tool, TenantContext.require_tenant_id())
 
     def delete(self, tool_id):
-        return self.tool_repository.delete(tool_id)
+        return self.tool_repository.delete(tool_id, TenantContext.require_tenant_id())
 
     def get(self, tool_id):
-        return self.tool_repository.get(tool_id)
+        return self.tool_repository.get(tool_id, TenantContext.require_tenant_id())

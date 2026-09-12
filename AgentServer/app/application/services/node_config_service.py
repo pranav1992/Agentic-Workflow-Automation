@@ -2,6 +2,7 @@ from app.infrastructure.repository.node_config_repository import\
                                                     NodeConfigRepository
 from app.domain.schema import NodeConfigCreate
 from app.infrastructure.db.models import NodeConfig
+from app.core.tenancy import TenantContext
 
 
 class NodeConfigService:
@@ -9,17 +10,25 @@ class NodeConfigService:
         self.node_config_repo = node_config_repo
 
     def create(self, node_config: NodeConfigCreate):
-        data = NodeConfig(**node_config.model_dump())
+        data = NodeConfig(
+            **node_config.model_dump(), tenant_id=TenantContext.require_tenant_id()
+        )
         return self.node_config_repo.create(data)
 
     def update(self, node_config):
         config_id = getattr(node_config, "id", None)
         if not config_id:
             return None
-        return self.node_config_repo.update(config_id, node_config.config)
+        return self.node_config_repo.update(
+            config_id, node_config.config, TenantContext.require_tenant_id()
+        )
 
     def get(self, node_config_id):
-        return self.node_config_repo.get_node_config(node_config_id)
+        return self.node_config_repo.get_node_config(
+            node_config_id, TenantContext.require_tenant_id()
+        )
 
     def delete(self, node_config_id):
-        return self.node_config_repo.delete(node_config_id)
+        return self.node_config_repo.delete(
+            node_config_id, TenantContext.require_tenant_id()
+        )
