@@ -98,35 +98,36 @@ def get_resource(self, resource_id: UUID) -> MyResource:
 
 ## Authentication & Authorization
 
-### User Roles
-- **ADMIN**: Full system access
-- **TENANT_ADMIN**: Tenant-level administration
-- **OPERATOR**: Workflow management and execution
-- **AGENT**: Read-only access
-- **SERVICE_ACCOUNT**: Automated access
+**Current behavior:** every route requires a signed-in user (a valid JWT).
+There is no role check beyond that — `UserRole` (`ADMIN`, `TENANT_ADMIN`,
+`OPERATOR`, `AGENT`, `SERVICE_ACCOUNT`) and `RBACManager`/`PermissionScope`
+still exist in `app/core/constants.py` / `app/core/security.py`, but nothing
+calls `RBACManager.has_permission(...)` anymore — it's dead code, kept
+around in case per-role permissions come back. This is a deliberate
+simplification for a demo app: any authenticated user can do everything.
 
-### Permission System
 ```python
-from app.core.constants import PermissionScope, UserRole
-from app.core.security import RBACManager
-
-# Check permission
-if not RBACManager.has_permission(user_role, PermissionScope.WORKFLOW_CREATE):
-    raise ForbiddenError("Insufficient permissions")
+# app/api/dependencies/auth.py — the only gate, applied per-router:
+router = APIRouter(..., dependencies=[Depends(get_current_user)])
 ```
 
 ### JWT Tokens
 ```python
-# Create token
+# Create token (app/application/services/auth_service.py)
 token = auth_service.create_access_token(
     user_id=user.id,
     tenant_id=tenant.id,
-    role=user.role
+    role=user.role,
 )
 
-# Verify token
-claims = jwt_manager.decode_token(token)
+# Verify token (app/api/dependencies/auth.py:get_current_user)
+claims = get_jwt_manager().decode_token(token)
 ```
+
+**If per-role authorization is needed again:** reintroduce a dependency
+(e.g. a new `require_permission(scope)`) that calls `RBACManager` and gate
+the specific mutating routes with it, the same way `require_admin` used to
+before it was removed.
 
 ## Logging & Observability
 
@@ -166,23 +167,83 @@ audit_service.log_action(
 
 ## Rate Limiting
 
+Two global middlewares (`app/api/middleware.py`), wired in `app/main.py`,
+sit in front of every route — there are no per-route decorators to add or
+forget:
+
+- **`RateLimitMiddleware`** — the general cap. Keys on the caller's JWT
+  `sub` claim when a valid bearer token is present, else falls back to
+  client IP (covers unauthenticated/bad-token requests). Skips `/health*`.
+- **`LoginRateLimitMiddleware`** — a tighter, IP-keyed cap on
+  `POST /auth/login` specifically. Login is unauthenticated by definition,
+  so the general per-user limiter above can't key on identity there;
+  without this, a script could brute-force passwords at the general
+  request rate.
+
+Both use the existing `RateLimiter` (`app/core/rate_limiter.py`) — a
+sliding-window counter keyed by string, backed by a plain in-process
+`dict`. The old `@rate_limit` decorator in that module is dead code from
+before these middlewares existed; nothing calls it.
+
 ### Configuration
-```python
-# In .env.local
+```bash
+# .env.local
 RATE_LIMIT_ENABLED=true
-RATE_LIMIT_REQUESTS=100
-RATE_LIMIT_PERIOD_SECONDS=60
+RATE_LIMIT_REQUESTS=100          # general cap...
+RATE_LIMIT_PERIOD_SECONDS=60     # ...per this many seconds, per user/IP
+LOGIN_RATE_LIMIT_ATTEMPTS=10     # login-specific cap...
+LOGIN_RATE_LIMIT_WINDOW_SECONDS=300  # ...per this many seconds, per IP
 ```
 
-### Usage
-```python
-from app.core.rate_limiter import rate_limit
+There's also a third, narrower limiter that predates these two and stays
+independent of them: `SessionService._enforce_launch_limits`
+(`app/application/services/session_service.py`) caps concurrent voice-demo
+sessions and per-IP launches, because each session is a billed real-time
+audio stream — a request-count limit alone wouldn't bound the actual cost.
+Leave that one as-is; it's solving a different problem (spend, not abuse).
 
-@router.post("/workflows")
-@rate_limit(limit=10, window=60)  # 10 requests per minute
-async def create_workflow(request: Request, ...):
-    ...
-```
+### Tradeoffs — why not `slowapi` (or another library)
+
+[`slowapi`](https://github.com/laurentS/slowapi) wraps the `limits`
+library and would give per-route `@limiter.limit("10/minute")` decorators,
+automatic `X-RateLimit-*`/`Retry-After` response headers, and pluggable
+backends (in-memory, Redis, memcached).
+
+We didn't reach for it because the one thing an in-process `dict` can't do
+— survive being one of *several* processes sharing the same limit — isn't
+true here yet:
+
+| | This implementation | `slowapi` (+ Redis) |
+|---|---|---|
+| Storage | Plain `dict` in the API process's memory | Pluggable — in-memory or Redis/memcached |
+| Correct with 1 process | Yes | Yes |
+| Correct with N processes/replicas | **No** — each process enforces its own separate allowance, so the real limit becomes `limit × N` | Yes, with a shared backend (Redis) |
+| Response headers | Plain `429 {"detail": ...}` | Standard `X-RateLimit-*` / `Retry-After` |
+| Per-route granularity | Two blanket middlewares (global + login) | Decorator per route, easy to vary by endpoint |
+| New dependency | None | `slowapi` + a Redis instance |
+
+Today the API runs as a single `uvicorn` process, no `--workers` flag, one
+container (`Dockerfile:42`, `Dockerfile.prod:57`, `docker-compose.prod.yml`)
+— so a single shared `dict` *is* the correct amount of engineering, not a
+shortcut. This mirrors the existing `_launch_history` dict in
+`SessionService`, which carries the same caveat in a comment.
+
+### Scale plan — when to revisit
+
+Swap to `slowapi` + Redis (or move `RateLimiter`'s state into Redis
+directly, keeping the same two middlewares) **before**, not after, any of:
+
+1. `uvicorn ... --workers N` is added to either Dockerfile.
+2. `docker-compose.prod.yml` scales the `api` service to more than one
+   replica, or a load balancer fans requests across multiple hosts.
+3. Standard `Retry-After`/`X-RateLimit-*` headers become a real
+   requirement (e.g. a public API consumed by third-party clients that
+   expect them).
+
+None of these are true today. If/when one becomes planned work, do the
+swap as its own change rather than bundling it with the feature that
+triggers it — the middleware call sites (`app/main.py`) don't need to
+change either way, only what backs `get_rate_limiter()`.
 
 ## Feature Flags
 

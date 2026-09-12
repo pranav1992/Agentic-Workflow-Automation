@@ -11,6 +11,8 @@ from app.api.middleware import (
     RequestTimingMiddleware,
     SecurityHeadersMiddleware,
     ErrorHandlingMiddleware,
+    RateLimitMiddleware,
+    LoginRateLimitMiddleware,
 )
 from app.core.settings import get_settings
 from app.core.exceptions import setup_exception_handlers
@@ -52,6 +54,8 @@ def create_app() -> FastAPI:
     app.add_middleware(ErrorHandlingMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestTimingMiddleware)
+    app.add_middleware(LoginRateLimitMiddleware)
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(TenantIsolationMiddleware)
     app.add_middleware(RequestIdMiddleware)
     

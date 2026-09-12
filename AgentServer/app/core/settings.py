@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool = Field(default=True)
     RATE_LIMIT_REQUESTS: int = Field(default=100)
     RATE_LIMIT_PERIOD_SECONDS: int = Field(default=60)
+    # Tighter, IP-keyed cap on POST /auth/login specifically — the general
+    # limit above is keyed per signed-in user, which doesn't help against a
+    # password-guessing script hitting an unauthenticated endpoint.
+    LOGIN_RATE_LIMIT_ATTEMPTS: int = Field(default=10)
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = Field(default=300)
     
     # Feature flags
     FEATURE_FLAGS: dict = Field(default_factory=dict)
