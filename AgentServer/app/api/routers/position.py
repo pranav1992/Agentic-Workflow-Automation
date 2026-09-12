@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.application.services.position_service import PositionService
 from app.api.dependencies.services import get_position_service
-from app.api.dependencies.auth import require_admin
+from app.api.dependencies.auth import get_current_user
 from app.domain.schema import PositionUpdate
 from typing import List
 
@@ -10,7 +10,7 @@ from typing import List
 router = APIRouter(
     prefix="/positions",
     tags=["positions"],
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(get_current_user)],
 )
 
 

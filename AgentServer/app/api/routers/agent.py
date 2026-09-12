@@ -5,31 +5,29 @@ from app.domain.schema import (
 from fastapi import Depends
 from app.application.facade.agent_facade import AgentFacade
 from app.api.dependencies.services import get_agent_service, get_agent_facade
-from app.api.dependencies.auth import require_admin
+from app.api.dependencies.auth import get_current_user
 
 
 router = APIRouter(
     prefix="/agents",
     tags=["agents"],
+    dependencies=[Depends(get_current_user)],
 )
 
 
-@router.post("/", response_model=AgentWithPositionResponse,
-             dependencies=[Depends(require_admin)])
+@router.post("/", response_model=AgentWithPositionResponse)
 def create_agent(agent: AgentPayload, agent_facade: AgentFacade = Depends(
                                                         get_agent_facade)):
     return agent_facade.create_agent(agent)
 
 
-@router.put("/", response_model=AgentWithPositionResponse,
-            dependencies=[Depends(require_admin)])
+@router.put("/", response_model=AgentWithPositionResponse)
 def update_agent(agent: AgentPayload, agent_facade: AgentFacade = Depends(
                                                     get_agent_facade)):
     return agent_facade.update_agent(agent)
 
 
-@router.delete("/{id}", response_model=AgentWithPositionResponse,
-               dependencies=[Depends(require_admin)])
+@router.delete("/{id}", response_model=AgentWithPositionResponse)
 def delete_agent(id, agent_service: AgentService = Depends(
                                                     get_agent_service)):
     return agent_service.delete(id)

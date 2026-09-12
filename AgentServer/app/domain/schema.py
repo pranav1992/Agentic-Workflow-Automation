@@ -223,3 +223,25 @@ class WorkflowStatusResponse(BaseModel):
     session_id: Optional[UUID] = None
     room_name: Optional[str] = None
     started_at: Optional[datetime] = None
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: UUID
+    tenant_id: UUID
+    email: str
+    username: str
+    full_name: Optional[str] = None
+    role: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse

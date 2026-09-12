@@ -18,6 +18,7 @@ from app.application.services.tool_service import ToolService
 from app.infrastructure.repository.tool_repository import ToolRepository
 from app.application.services.session_service import SessionService
 from app.infrastructure.repository.session_repository import SessionRepository
+from app.application.services.auth_service import AuthService
 
 
 def get_agent_service(
@@ -82,3 +83,9 @@ def get_session_service(
 ) -> SessionService:
     repo = SessionRepository(session)
     return SessionService(repo)
+
+
+def get_auth_service(
+    session: Session = Depends(get_session)
+) -> AuthService:
+    return AuthService(session)

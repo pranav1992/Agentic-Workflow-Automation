@@ -65,10 +65,6 @@ services:
       # on (APP_HOST below), or the browser gets CORS errors on every
       # API call.
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set}
-      # Shared secret gating every mutating endpoint. Required: the guard
-      # fails closed, so without it the builder is read-only rather than
-      # silently open to the internet.
-      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:?ADMIN_API_TOKEN must be set}
       # Spend caps for the public demo. MAX_SESSION_SECONDS is passed to the
       # worker too — both must agree or the API's token TTL and the worker's
       # wall-clock cap drift apart.

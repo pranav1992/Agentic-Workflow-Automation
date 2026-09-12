@@ -6,6 +6,7 @@ import { useNavigate } from "react-router";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import WorkflowHistoryDrawer from "../components/workflow/WorkflowHistoryDrawer";
 import theme from "../theme";
+import { getAuthUser, clearAuthSession } from "../api/client";
 
 function WorkflowStatusBadge({ workflowId }) {
   const { data } = useQuery({
@@ -53,6 +54,12 @@ function CreateWorkFlowPage() {
   const navigate = useNavigate();
   const loadingStartRef = useRef(0);
   const [showLoading, setShowLoading] = useState(false);
+  const authUser = getAuthUser();
+
+  const handleSignOut = useCallback(() => {
+    clearAuthSession();
+    navigate("/login", { replace: true });
+  }, [navigate]);
 
   const queryClient = useQueryClient();
   const {
@@ -173,25 +180,49 @@ function CreateWorkFlowPage() {
             VoiceOrchid
           </span>
         </div>
-        <button
-          onClick={startNewWorkflow}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "9px 18px",
-            borderRadius: theme.radius,
-            border: "none",
-            background: theme.primary,
-            color: "white",
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer",
-            letterSpacing: "0.1px",
-          }}
-        >
-          + New Workflow
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button
+            onClick={startNewWorkflow}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "9px 18px",
+              borderRadius: theme.radius,
+              border: "none",
+              background: theme.primary,
+              color: "white",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              letterSpacing: "0.1px",
+            }}
+          >
+            + New Workflow
+          </button>
+          {authUser && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 12, color: theme.textSecondary }}>
+                {authUser.email}
+              </span>
+              <button
+                onClick={handleSignOut}
+                style={{
+                  padding: "7px 12px",
+                  borderRadius: theme.radius,
+                  border: `1px solid ${theme.border}`,
+                  background: "none",
+                  color: theme.textSecondary,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Page body */}

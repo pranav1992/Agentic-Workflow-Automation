@@ -2,11 +2,15 @@ from fastapi import APIRouter, Depends
 from app.application.facade.tool_facade import ToolFacade
 from app.application.services.tool_service import ToolService
 from app.api.dependencies.services import get_tool_facade, get_tool_service
-from app.api.dependencies.auth import require_admin
+from app.api.dependencies.auth import get_current_user
 from app.domain.schema import ToolPayload, ToolWithPositionResponse
 
 
-router = APIRouter(prefix="/tools", tags=["tools"],)
+router = APIRouter(
+    prefix="/tools",
+    tags=["tools"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.get("/{workflow_id}")
@@ -25,14 +29,13 @@ async def get_all_tools_by_agent(
     return tool_service.get_all_tools_by_agent(agent_id)
 
 
-@router.post("/", response_model=ToolWithPositionResponse,
-             dependencies=[Depends(require_admin)])
+@router.post("/", response_model=ToolWithPositionResponse)
 async def create_tool(tool_data: ToolPayload, tool_facade:
                       ToolFacade = Depends(get_tool_facade)):
     return tool_facade.create_tool(tool_data)
 
 
-@router.put("/", dependencies=[Depends(require_admin)])
+@router.put("/")
 async def update_tool(
     tool: ToolPayload,
     tool_facade: ToolFacade = Depends(get_tool_facade),
@@ -40,7 +43,7 @@ async def update_tool(
     return tool_facade.update_tool(tool)
 
 
-@router.delete("/{tool_id}", dependencies=[Depends(require_admin)])
+@router.delete("/{tool_id}")
 async def delete_tool(tool_id, tool_facade: ToolFacade = Depends(
                                                         get_tool_facade)):
     return tool_facade.delete_tool(tool_id)

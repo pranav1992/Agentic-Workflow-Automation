@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import workflows, agent, tool, edge, position
+from app.api.routers import workflows, agent, tool, edge, position, auth
 from app.infrastructure.db.engine import create_db_and_tables
 from app.api.exceptions.base_exception_handler import base_exception_handler
 from app.api.middleware import (
@@ -44,6 +44,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         docs_url="/api/docs" if not settings.is_production else None,
         redoc_url="/api/redoc" if not settings.is_production else None,
+        openapi_url="/openapi.json" if not settings.is_production else None,
         debug=settings.DEBUG,
     )
     
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     setup_exception_handlers(app)
     
     # Include v1 routers
+    app.include_router(auth.router)
     app.include_router(workflows.router)
     app.include_router(agent.router)
     app.include_router(tool.router)

@@ -8,27 +8,31 @@ const timeout =
     ? Number(import.meta.env.VITE_APP_API_TIMEOUT)
     : 10000; // 10s default
 
-const ADMIN_TOKEN_KEY = "voiceorchid_admin_token";
+const AUTH_TOKEN_KEY = "voiceorchid_auth_token";
+const AUTH_USER_KEY = "voiceorchid_auth_user";
 
-export const getAdminToken = () => localStorage.getItem(ADMIN_TOKEN_KEY) || "";
+// JWT issued by POST /auth/login. Sent as a Bearer token; per
+// app/api/dependencies/auth.py, every route just requires a signed-in user
+// — there's no admin/operator distinction, any authenticated user can do
+// everything.
+export const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY) || "";
 
-export const setAdminToken = (token) => {
-  if (token) localStorage.setItem(ADMIN_TOKEN_KEY, token);
-  else localStorage.removeItem(ADMIN_TOKEN_KEY);
+export const getAuthUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_USER_KEY) || "null");
+  } catch {
+    return null;
+  }
 };
 
-// Reads/voice-demo routes are public; only mutations need the token. Picking it
-// up from ?admin_token=... lets an operator enrol a browser from a link without
-// a login screen, then strips it from the URL so it isn't left in history.
-const tokenFromUrl = new URLSearchParams(window.location.search).get(
-  "admin_token",
-);
-if (tokenFromUrl) {
-  setAdminToken(tokenFromUrl);
-  const url = new URL(window.location.href);
-  url.searchParams.delete("admin_token");
-  window.history.replaceState({}, "", url.toString());
-}
+export const setAuthSession = (token, user) => {
+  if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
+  else localStorage.removeItem(AUTH_TOKEN_KEY);
+  if (user) localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  else localStorage.removeItem(AUTH_USER_KEY);
+};
+
+export const clearAuthSession = () => setAuthSession(null, null);
 
 export const apiClient = axios.create({
   baseURL,
@@ -36,8 +40,8 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  const token = getAdminToken();
-  if (token) config.headers["X-Admin-Token"] = token;
+  const authToken = getAuthToken();
+  if (authToken) config.headers["Authorization"] = `Bearer ${authToken}`;
   return config;
 });
 
@@ -45,15 +49,22 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
-    // Turn the raw 401/503 into something actionable — without this an
-    // operator whose token is missing just sees edits silently fail.
+    // Turn the raw 401 into something actionable — without this a
+    // signed-out user just sees requests silently fail.
     if (status === 401) {
-      error.userMessage = getAdminToken()
-        ? "Your admin token was rejected. Re-open the app with ?admin_token=<token>."
-        : "This action needs an admin token. Open the app with ?admin_token=<token>.";
-    } else if (status === 503) {
-      error.userMessage =
-        "Editing is disabled: the server has no ADMIN_API_TOKEN configured.";
+      const hadAuthToken = !!getAuthToken();
+      error.userMessage = hadAuthToken
+        ? "Your session has expired. Please sign in again."
+        : "This action needs you to be signed in.";
+      // Login itself returns 401 for bad credentials — that shouldn't bounce
+      // the sign-in page back to itself, so only redirect for an expired
+      // session on an otherwise-authenticated request.
+      if (hadAuthToken && !error.config?.url?.includes("/auth/login")) {
+        clearAuthSession();
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+      }
     } else if (status === 429) {
       error.userMessage =
         error.response?.data?.detail ||

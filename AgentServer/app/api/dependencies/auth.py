@@ -1,33 +1,28 @@
-import secrets
 from typing import Optional
 
 from fastapi import Header, HTTPException, status
 
-from app.core.settings import get_settings
+from app.core.security import get_jwt_manager
 
 
-def require_admin(x_admin_token: Optional[str] = Header(default=None)) -> None:
-    """Guards mutating endpoints with a shared secret.
+def _decode_bearer_token(authorization: Optional[str]) -> Optional[dict]:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(" ", 1)[1].strip()
+    return get_jwt_manager().decode_token(token)
 
-    Reads and the voice-demo launch stay public on purpose — the demo is meant
-    for anonymous visitors — but nobody anonymous should be able to rewrite or
-    delete workflows, or read back tool configs that may carry credentials.
 
-    Fails closed: if ADMIN_API_TOKEN isn't configured, every mutation is
-    refused rather than silently left open, so a missing env var can't
-    reintroduce the hole this exists to close.
+def get_current_user(authorization: Optional[str] = Header(default=None)) -> dict:
+    """Resolve the signed-in user from a `Authorization: Bearer <jwt>` header.
+
+    This is the only gate on every route: any signed-in user, regardless of
+    role, can read and write everything. There's no admin/operator
+    distinction — role is unused for authorization.
     """
-    settings = get_settings()
-    expected = settings.ADMIN_API_TOKEN
-
-    if not expected:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="ADMIN_API_TOKEN is not configured; mutations are disabled.",
-        )
-
-    if not x_admin_token or not secrets.compare_digest(x_admin_token, expected):
+    payload = _decode_bearer_token(authorization)
+    if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid X-Admin-Token.",
+            detail="Missing or invalid bearer token.",
         )
+    return payload

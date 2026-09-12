@@ -57,6 +57,26 @@ class AuthService:
         self.db.refresh(user)
         return user
     
+    def authenticate_user_by_email(self, email: str, password: str) -> Optional[User]:
+        """Authenticate a user by email alone, without a known tenant.
+
+        Email is only unique per-tenant, so this is a best-effort lookup for
+        the sign-in form (which has no tenant selector): it matches active
+        users by email and accepts the first whose password verifies.
+        """
+        candidates = self.db.query(User).filter(
+            User.email == email,
+            User.is_active == True
+        ).all()
+
+        for user in candidates:
+            if self.encryption.verify_hash(password, user.password_hash, user.password_salt):
+                user.last_login = datetime.now()
+                self.db.commit()
+                return user
+
+        return None
+
     def authenticate_user(self, email: str, password: str, tenant_id: UUID) -> Optional[User]:
         """Authenticate user with email and password"""
         user = self.db.query(User).filter(

@@ -32,11 +32,6 @@ class Settings(BaseSettings):
     
     # Security
     JWT_SECRET_KEY: str
-    # Shared secret guarding every mutating endpoint (workflow/agent/tool/edge/
-    # position writes). Sent by the builder UI as an X-Admin-Token header.
-    # Reads and the public voice demo deliberately stay open; see
-    # app/api/dependencies/auth.py.
-    ADMIN_API_TOKEN: Optional[str] = Field(default=None)
     JWT_ALGORITHM: str = Field(default="HS256")
     JWT_EXPIRE_MINUTES: int = Field(default=30)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30)
