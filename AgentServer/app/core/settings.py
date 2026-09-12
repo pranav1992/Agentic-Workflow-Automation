@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     # password-guessing script hitting an unauthenticated endpoint.
     LOGIN_RATE_LIMIT_ATTEMPTS: int = Field(default=10)
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = Field(default=300)
+    # Per-account lockout — independent of the per-IP limit above, which a
+    # distributed attacker (many IPs) can otherwise route around entirely.
+    ACCOUNT_LOCKOUT_THRESHOLD: int = Field(default=5)
+    ACCOUNT_LOCKOUT_DURATION_SECONDS: int = Field(default=900)
     
     # Feature flags
     FEATURE_FLAGS: dict = Field(default_factory=dict)

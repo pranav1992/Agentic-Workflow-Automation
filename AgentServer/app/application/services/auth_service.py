@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.infrastructure.db.auth_models import User, Tenant
 from app.core.security import JWTManager, EncryptionManager
 from app.core.constants import UserRole
+from app.core.settings import get_settings
+from app.domain.exceptions import AccountLockedError
 
 
 class AuthService:
@@ -63,17 +65,44 @@ class AuthService:
         Email is only unique per-tenant, so this is a best-effort lookup for
         the sign-in form (which has no tenant selector): it matches active
         users by email and accepts the first whose password verifies.
+
+        Per-account lockout here is independent of (and on top of) the
+        per-IP login rate limit in LoginRateLimitMiddleware — that one
+        alone lets a distributed attacker (many IPs) still brute-force one
+        specific account at the per-IP rate.
         """
+        settings = get_settings()
+        now = datetime.now()
+
         candidates = self.db.query(User).filter(
             User.email == email,
             User.is_active == True
         ).all()
 
+        locked_candidate = None
         for user in candidates:
+            if user.locked_until and user.locked_until > now:
+                locked_candidate = user
+                continue
+
             if self.encryption.verify_hash(password, user.password_hash, user.password_salt):
-                user.last_login = datetime.now()
+                user.failed_login_attempts = 0
+                user.locked_until = None
+                user.last_login = now
                 self.db.commit()
                 return user
+
+            user.failed_login_attempts += 1
+            if user.failed_login_attempts >= settings.ACCOUNT_LOCKOUT_THRESHOLD:
+                user.locked_until = now + timedelta(
+                    seconds=settings.ACCOUNT_LOCKOUT_DURATION_SECONDS
+                )
+                locked_candidate = user
+            self.db.commit()
+
+        if locked_candidate is not None:
+            retry_after = int((locked_candidate.locked_until - now).total_seconds())
+            raise AccountLockedError(retry_after)
 
         return None
 

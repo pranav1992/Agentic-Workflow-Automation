@@ -51,6 +51,11 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=True, index=True)
     is_verified: bool = Field(default=False)
     last_login: Optional[datetime] = Field(default=None)
+    # Per-account lockout, independent of the per-IP login rate limit
+    # (LoginRateLimitMiddleware) — that one alone lets a distributed
+    # attacker (many IPs) still brute-force one specific account.
+    failed_login_attempts: int = Field(default=0)
+    locked_until: Optional[datetime] = Field(default=None)
     extra_data: Dict[str, Any] = Field(default_factory=dict, sa_column=Column("metadata", JSONB, nullable=False, server_default="{}"))
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)

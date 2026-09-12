@@ -23,8 +23,10 @@ from .system import (
     SystemConfigurationError,
     TenantRequiredError,
 )
+from .auth import AccountLockedError
 
 __all__ = [
+    "AccountLockedError",
     "AgentAlreadyInitializedError",
     "AgentNameAlreadyExist",
     "AgentNotFoundError",

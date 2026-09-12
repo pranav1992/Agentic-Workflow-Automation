@@ -55,20 +55,27 @@ could set to anything — making #1's fix spoofable even once it existed.
 and reads `tenant_id` from its verified claims; the `X-Tenant-ID` header
 is no longer read anywhere.
 
-### 3. No account lockout beyond a per-IP request cap
+### 3. ~~No account lockout beyond a per-IP request cap~~ — FIXED
 
-**What:** `LoginRateLimitMiddleware` limits login *attempts per IP*
-(`LOGIN_RATE_LIMIT_ATTEMPTS` / `LOGIN_RATE_LIMIT_WINDOW_SECONDS`, default
-10/5min) but there's no per-account lockout, no exponential backoff, and
-no alerting. A distributed attacker (many IPs) can still brute-force one
-specific account at 10 attempts per IP × however many IPs they control.
+**Was:** `LoginRateLimitMiddleware` limited login attempts *per IP* only.
+A distributed attacker (many IPs) could still brute-force one specific
+account at the per-IP rate × however many IPs they controlled.
 
-**Why it matters:** passwords have no minimum strength requirement either
-(see #6), so a brute-forceable account is a real risk, not theoretical.
+**Fix applied:** `User` (`app/infrastructure/db/auth_models.py`) gained
+`failed_login_attempts` and `locked_until` columns (migration
+`2e3333b3cace`). `AuthService.authenticate_user_by_email`
+(`app/application/services/auth_service.py`) increments the counter on
+each wrong password and locks the account for
+`ACCOUNT_LOCKOUT_DURATION_SECONDS` (default 15 min) after
+`ACCOUNT_LOCKOUT_THRESHOLD` (default 5) consecutive failures — resetting
+on a successful login. A locked account gets `423 Locked` with a
+`Retry-After` header, even if the correct password is supplied, until
+the lock expires. This is independent of and stacks with the per-IP
+limit — both must pass.
 
-**Fix:** add a per-`user_id` (or per-email) failure counter alongside the
-per-IP one, with a lockout or increasing delay after N consecutive
-failures, and log/alert on it via the existing `AuditLogService`.
+**Not done:** no alerting/audit-log entry when a lockout trips. Worth
+adding via the existing `AuditLogService` if this ever needs to be
+monitored rather than just self-healing after the timeout.
 
 ### 4. JWTs can't be revoked
 

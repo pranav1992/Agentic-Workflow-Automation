@@ -3,6 +3,7 @@ from .system import system_exception_handler
 from .workflow import workflow_exception_handler
 from .edge import edge_exception_handler
 from .tool import tool_exception_handler
+from .auth import auth_exception_handler
 
 
 def base_exception_handler(app):
@@ -13,5 +14,6 @@ def base_exception_handler(app):
     system_exception_handler(app)
     edge_exception_handler(app)
     tool_exception_handler(app)
+    auth_exception_handler(app)
 
     return app
