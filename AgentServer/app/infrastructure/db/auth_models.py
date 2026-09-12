@@ -56,6 +56,13 @@ class User(SQLModel, table=True):
     # attacker (many IPs) still brute-force one specific account.
     failed_login_attempts: int = Field(default=0)
     locked_until: Optional[datetime] = Field(default=None)
+    # Bumped on logout (and available for "sign out everywhere"/password
+    # change later). Embedded in every issued JWT as "tv"; a token whose
+    # "tv" doesn't match the current value is rejected even though it
+    # hasn't expired yet — see get_current_user. This invalidates every
+    # outstanding token for the user at once; there's no per-device
+    # session tracking to revoke just one.
+    token_version: int = Field(default=0)
     extra_data: Dict[str, Any] = Field(default_factory=dict, sa_column=Column("metadata", JSONB, nullable=False, server_default="{}"))
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)

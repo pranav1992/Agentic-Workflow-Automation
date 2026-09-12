@@ -127,15 +127,26 @@ class AuthService:
         
         return user
     
-    def create_access_token(self, user_id: UUID, tenant_id: UUID, role: UserRole) -> str:
+    def create_access_token(
+        self, user_id: UUID, tenant_id: UUID, role: UserRole, token_version: int = 0
+    ) -> str:
         """Create JWT access token"""
         data = {
             "sub": str(user_id),
             "tenant_id": str(tenant_id),
             "role": role.value,
-            "type": "access"
+            "type": "access",
+            # Checked against User.token_version in get_current_user —
+            # bumping that column (on logout) invalidates every token
+            # issued before the bump, even ones that haven't expired yet.
+            "tv": token_version,
         }
         return self.jwt_manager.create_access_token(data)
+
+    def revoke_all_tokens(self, user: User) -> None:
+        """Invalidate every outstanding token for this user (logout)."""
+        user.token_version += 1
+        self.db.commit()
     
     def verify_token(self, token: str) -> Optional[dict]:
         """Verify and decode JWT token"""

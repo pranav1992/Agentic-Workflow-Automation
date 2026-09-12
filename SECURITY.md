@@ -77,21 +77,28 @@ limit — both must pass.
 adding via the existing `AuditLogService` if this ever needs to be
 monitored rather than just self-healing after the timeout.
 
-### 4. JWTs can't be revoked
+### 4. ~~JWTs can't be revoked~~ — FIXED
 
-**What:** there's no token blacklist/allowlist and no `/auth/logout`
-endpoint. A JWT is valid for its full lifetime
-(`JWT_EXPIRE_MINUTES`, default 30) no matter what happens to the account
-afterward — password changed, user deactivated, token stolen.
+**Was:** no token blacklist/allowlist and no `/auth/logout` endpoint. A
+JWT was valid for its full lifetime no matter what happened to the
+account afterward — "sign out" in the frontend only cleared
+`localStorage`; the token itself stayed valid until it expired.
 
-**Why it matters:** 30 minutes is a short blast radius today, but there's
-no mechanism to cut a session short if you needed to (e.g. a leaked
-token, an offboarded user). "Sign out" in the frontend only clears
-`localStorage` — the token itself is still valid until it expires.
+**Fix applied:** `User` gained a `token_version` column (migration
+`a709c0b45d57`), embedded in every issued JWT as the `tv` claim.
+`get_current_user` (`app/api/dependencies/auth.py`) now checks that claim
+against the user's current `token_version` on every request — a mismatch
+is a `401` even for a token that hasn't expired. `POST /auth/logout`
+bumps `token_version`, immediately invalidating every outstanding token
+for that user. The frontend's sign-out button calls it before clearing
+local state.
 
-**Fix:** either keep expiry short and accept the tradeoff explicitly, or
-add a revocation list (even a simple `revoked_token_jti` table checked in
-`get_current_user`) for cases that need immediate effect.
+**Tradeoff accepted:** this is "sign out everywhere," not per-device —
+there's no session/device tracking, so revoking invalidates *all* of a
+user's tokens at once, not just the one used to log out. Also adds a DB
+lookup to every authenticated request (previously pure JWT decode, no
+DB hit) — fine at this app's scale, worth reconsidering if request
+volume ever makes that lookup a bottleneck.
 
 ### 5. Containers run as root
 

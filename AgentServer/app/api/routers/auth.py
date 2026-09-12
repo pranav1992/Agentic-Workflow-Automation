@@ -29,12 +29,28 @@ def login(
         )
 
     token = auth_service.create_access_token(
-        user_id=user.id, tenant_id=user.tenant_id, role=UserRole(user.role)
+        user_id=user.id,
+        tenant_id=user.tenant_id,
+        role=UserRole(user.role),
+        token_version=user.token_version,
     )
     return LoginResponse(
         access_token=token,
         user=UserResponse.model_validate(user),
     )
+
+
+@router.post("/logout", status_code=204)
+def logout(
+    payload: dict = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """Invalidates every token issued to this user, not just the one used
+    to call this endpoint — there's no per-device session tracking to
+    revoke just one, so this is "sign out everywhere.\""""
+    user = auth_service.get_user(UUID(payload["sub"]))
+    if user:
+        auth_service.revoke_all_tokens(user)
 
 
 @router.get("/me", response_model=UserResponse)

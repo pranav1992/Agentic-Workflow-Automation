@@ -7,6 +7,7 @@ import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import WorkflowHistoryDrawer from "../components/workflow/WorkflowHistoryDrawer";
 import theme from "../theme";
 import { getAuthUser, clearAuthSession } from "../api/client";
+import { logout } from "../api/auth";
 
 function WorkflowStatusBadge({ workflowId }) {
   const { data } = useQuery({
@@ -56,7 +57,13 @@ function CreateWorkFlowPage() {
   const [showLoading, setShowLoading] = useState(false);
   const authUser = getAuthUser();
 
-  const handleSignOut = useCallback(() => {
+  const handleSignOut = useCallback(async () => {
+    try {
+      await logout();
+    } catch {
+      // Best-effort: even if the server call fails (offline, expired
+      // token), still clear the local session and send the user to /login.
+    }
     clearAuthSession();
     navigate("/login", { replace: true });
   }, [navigate]);

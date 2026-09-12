@@ -12,3 +12,10 @@ export const getMe = async () => {
   const { data } = await apiClient.get("/auth/me");
   return data;
 };
+
+// Invalidates every token issued to this user server-side (not just this
+// browser's copy) — without this, "sign out" only forgot the token
+// locally while it stayed valid until expiry.
+export const logout = async () => {
+  await apiClient.post("/auth/logout");
+};
