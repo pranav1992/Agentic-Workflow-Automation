@@ -16,12 +16,13 @@ logger = get_logger(__name__)
 
 
 def _client_ip(request: Request) -> str:
-    # uvicorn runs with --proxy-headers behind Caddy, so request.client.host
-    # is already the real caller; X-Forwarded-For is only trusted as a
-    # fallback for setups where that isn't the case.
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    # uvicorn runs with --proxy-headers --forwarded-allow-ips=* behind
+    # Caddy (see Dockerfile), so Starlette's ProxyHeadersMiddleware has
+    # already parsed X-Forwarded-For and resolved request.client.host to
+    # the real caller. Re-parsing the raw header here instead would be
+    # wrong *and* attacker-controlled: anyone can send their own
+    # `X-Forwarded-For: 1.2.3.4` and have it taken at face value, which
+    # defeats IP-based limiting (most importantly on /auth/login) entirely.
     return request.client.host if request.client else "unknown"
 
 

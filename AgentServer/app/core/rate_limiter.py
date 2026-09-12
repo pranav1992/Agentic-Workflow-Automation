@@ -24,22 +24,28 @@ class RateLimiter:
             window: Time window in seconds
         """
         now = time.time()
-        
-        if key not in self.requests:
-            self.requests[key] = []
-        
+
         # Remove old requests outside the window
-        self.requests[key] = [
-            req_time for req_time in self.requests[key]
+        history = [
+            req_time for req_time in self.requests.get(key, [])
             if now - req_time < window
         ]
-        
+
+        # Drop the key entirely once its history is empty rather than
+        # leaving an empty list behind — otherwise every distinct key ever
+        # seen (every IP, every user) stays in this dict for the life of
+        # the process, growing without bound on a long-running instance.
+        if not history:
+            self.requests.pop(key, None)
+
         # Check if limit exceeded
-        if len(self.requests[key]) >= limit:
+        if len(history) >= limit:
+            self.requests[key] = history
             return False
-        
+
         # Add current request
-        self.requests[key].append(now)
+        history.append(now)
+        self.requests[key] = history
         return True
 
 
