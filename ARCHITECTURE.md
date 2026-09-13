@@ -357,6 +357,36 @@ ENABLE_TRACING=true
 
 ## Deployment
 
+### Infrastructure Provisioning (AWS)
+
+The production host is a single EC2 instance running the whole
+docker-compose.prod.yml stack. `scripts/provision.sh` creates or verifies
+every AWS resource it needs — security group, SSH key pair, the instance
+itself, and an Elastic IP — in one idempotent run:
+
+```bash
+scripts/provision.sh
+```
+
+Each step checks whether its resource already exists (by `Name` tag) and
+reuses it rather than creating a duplicate, so running this against an
+already-provisioned setup is a no-op status check, and running it
+against a blank AWS account builds the whole thing from scratch. It does
+*not* install Docker or deploy the app onto the instance — that's
+`scripts/ec2-start.sh`'s job, run once the instance exists.
+
+**Elastic IP:** the instance's public IP is now permanent
+(`scripts/provision.sh` allocates and associates it), so the
+`app.<dashed-ip>.sslip.io` / `api.<dashed-ip>.sslip.io` hostnames Caddy
+serves on no longer change across a stop/start — see
+`scripts/ec2-start.sh` and `caddy/Caddyfile`. Before this, the instance
+had no Elastic IP specifically to avoid AWS's small hourly charge for an
+EIP that isn't attached to a *running* instance; now that it has one,
+that charge applies while the instance is stopped (`scripts/ec2-stop.sh`
+prints a reminder). Trading a few dollars a month for a stable hostname
+was a deliberate choice — revert by disassociating/releasing the EIP if
+that tradeoff ever needs to flip back.
+
 ### Using Docker Compose (Production)
 ```bash
 # Copy environment template and fill in real secrets

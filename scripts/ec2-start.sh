@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# Starts the VoiceOrchid EC2 instance and re-points the app at its new
-# public IP. There's no Elastic IP on this instance (kept off to avoid
-# its cost while stopped), so the IP changes on every start.
+# Starts the VoiceOrchid EC2 instance and (re)deploys the app.
+#
+# The instance has an Elastic IP (see scripts/provision.sh), so its
+# public IP — and everything derived from it below — is now permanent
+# across stops/starts. This script still recomputes and rewrites those
+# values every run rather than assuming they're already right; that
+# makes it a safe no-op to re-run for a normal redeploy, and it still
+# self-heals correctly in the rare case the Elastic IP ever changes
+# (re-associated, deallocated and recreated, moved to a new instance).
 #
 # The app is served over HTTPS via Caddy on <role>.<dashed-ip>.sslip.io
 # hostnames (sslip.io resolves any subdomain of a dashed IP to that IP,
-# so this needs no real domain) — browsers only allow microphone access
-# on a secure context, so plain http://<ip> can't work. Since the IP
-# changes every start, so do these hostnames, so LIVEKIT_URL,
+# so this needs no purchased domain) — browsers only allow microphone
+# access on a secure context, so plain http://<ip> can't work. LIVEKIT_URL,
 # VITE_APP_BASE_URL, CORS_ORIGINS, and Caddy's own APP_HOST/API_HOST/
-# LIVEKIT_HOST all have to be refreshed and the client + Caddy
-# recreated (Caddy re-issues Let's Encrypt certs for the new names
-# automatically on start).
+# LIVEKIT_HOST all get (re)written and the client + Caddy recreated
+# (Caddy re-issues Let's Encrypt certs for the hostnames automatically).
 set -euo pipefail
 
 REGION="${REGION:-ap-south-1}"

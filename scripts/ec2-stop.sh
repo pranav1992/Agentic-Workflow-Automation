@@ -19,4 +19,7 @@ aws ec2 stop-instances --region "$REGION" --instance-ids "$INSTANCE_ID" >/dev/nu
 aws ec2 wait instance-stopped --region "$REGION" --instance-ids "$INSTANCE_ID"
 
 echo "Instance stopped. Compute billing paused; EBS storage still bills."
-echo "Note: its public IP will change on next start — run scripts/ec2-start.sh to bring it back up, it re-points the app at the new IP automatically."
+echo "Note: the Elastic IP keeps its hostname while stopped, but AWS bills"
+echo "a small hourly fee for an EIP that isn't attached to a running instance"
+echo "(unlike before, when there was no EIP and no such cost while stopped)."
+echo "Run scripts/ec2-start.sh to bring it back up and redeploy."
