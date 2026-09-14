@@ -1,6 +1,8 @@
 """
 Authentication service
 """
+import re
+import secrets
 from datetime import datetime, timedelta
 from uuid import UUID
 from typing import Optional, Tuple
@@ -10,6 +12,11 @@ from app.core.security import JWTManager, EncryptionManager
 from app.core.constants import UserRole
 from app.core.settings import get_settings
 from app.domain.exceptions import AccountLockedError
+
+
+def _slugify(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return slug or "org"
 
 
 class AuthService:
@@ -58,6 +65,61 @@ class AuthService:
         self.db.commit()
         self.db.refresh(user)
         return user
+
+    def register_new_tenant(
+        self,
+        tenant_name: str,
+        email: str,
+        password: str,
+        full_name: Optional[str] = None,
+    ) -> tuple[User, Tenant]:
+        """Self-registration: always creates a brand-new tenant (there's
+        no "join an existing organization" flow) with this user as its
+        first admin, then seeds the demo workflow into it so the new
+        tenant never lands on an empty workflow list — the same seeding
+        scripts/create_user.py does for operator-created accounts.
+        """
+        # Import locally: workflow_clone_service pulls in domain models
+        # this module doesn't otherwise need, and doing it at call time
+        # avoids a needless import for every other AuthService method.
+        from app.application.services.workflow_clone_service import (
+            clone_workflow_to_tenant,
+            DEMO_WORKFLOW_NAME,
+            DEMO_SOURCE_TENANT_SLUG,
+        )
+
+        base_slug = _slugify(tenant_name)
+        slug = base_slug
+        while self.db.query(Tenant).filter(Tenant.slug == slug).first():
+            slug = f"{base_slug}-{secrets.token_hex(3)}"
+
+        tenant = Tenant(name=tenant_name, slug=slug)
+        self.db.add(tenant)
+        self.db.flush()
+
+        user = self.create_user(
+            tenant_id=tenant.id,
+            email=email,
+            username=email.split("@")[0],
+            password=password,
+            full_name=full_name,
+            role=UserRole.ADMIN,
+        )
+
+        from app.infrastructure.db.models import WorkFlow
+
+        source_tenant = self.db.query(Tenant).filter(
+            Tenant.slug == DEMO_SOURCE_TENANT_SLUG
+        ).first()
+        if source_tenant:
+            demo_workflow = self.db.query(WorkFlow).filter_by(
+                tenant_id=source_tenant.id, name=DEMO_WORKFLOW_NAME
+            ).first()
+            if demo_workflow:
+                clone_workflow_to_tenant(self.db, demo_workflow.id, tenant.id)
+                self.db.commit()
+
+        return user, tenant
     
     def authenticate_user_by_email(self, email: str, password: str) -> Optional[User]:
         """Authenticate a user by email alone, without a known tenant.

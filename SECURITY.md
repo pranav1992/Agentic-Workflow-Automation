@@ -117,15 +117,25 @@ pattern already used in `Dockerfile.prod`.
 
 ### 6. No password strength requirements
 
-**What:** `AuthService.create_user`
-(`app/application/services/auth_service.py`) hashes and stores whatever
+**What:** `AuthService.create_user` and `AuthService.register_new_tenant`
+(`app/application/services/auth_service.py`) hash and store whatever
 string is passed as a password — no minimum length, complexity, or
-common-password check. This only matters today via
-`scripts/create_user.py` (there's no self-registration endpoint), but
-anything built on top of `create_user` later inherits the same gap.
+common-password check.
 
-**Fix:** validate password strength before hashing — even a simple
-minimum-length check closes the worst of it.
+**Why it matters more than it used to:** this was previously reachable
+only via `scripts/create_user.py`, run by a trusted operator. Now
+`POST /auth/register` is a public, unauthenticated endpoint — anyone can
+create an account with a one-character password. It's still rate-limited
+(shares the login/register IP cap) and per-account lockout still applies
+on the login side, but neither of those substitutes for the password
+itself being weak.
+
+**Explicitly deferred by request** — flagged, not fixed, per a prior
+decision in this project's history to skip it. Revisit if `/auth/register`
+is ever exposed beyond a trusted/internal audience.
+
+**Fix:** validate password strength before hashing in both call paths —
+even a simple minimum-length check closes the worst of it.
 
 ### 7. Rate limiting is in-process and single-instance only
 

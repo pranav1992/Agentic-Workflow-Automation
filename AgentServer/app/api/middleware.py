@@ -80,18 +80,19 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 
 class LoginRateLimitMiddleware(BaseHTTPMiddleware):
-    """Tighter, IP-keyed cap on /auth/login specifically.
+    """Tighter, IP-keyed cap on /auth/login and /auth/register.
 
-    Login is unauthenticated by definition, so the global per-user limiter
+    Both are unauthenticated by definition, so the global per-user limiter
     above can't key on identity here — without a separate, stricter cap a
-    script could brute-force passwords at the general request rate.
+    script could brute-force passwords (or spam-create tenants) at the
+    general request rate.
     """
 
-    PATH = "/auth/login"
+    PATHS = ("/auth/login", "/auth/register")
 
     async def dispatch(self, request: Request, call_next):
         settings = get_settings()
-        if not settings.RATE_LIMIT_ENABLED or request.url.path != self.PATH:
+        if not settings.RATE_LIMIT_ENABLED or request.url.path not in self.PATHS:
             return await call_next(request)
 
         limiter = get_rate_limiter()

@@ -21,6 +21,14 @@ from app.infrastructure.db.models import (
     NodeConfig,
 )
 
+# The one canonical demo workflow, and the tenant that owns it. Every
+# path that seeds a tenant's demo (scripts/create_user.py,
+# scripts/backfill_demo_workflows.py, AuthService.register_new_tenant)
+# looks it up by this same name/slug rather than each hardcoding its own
+# copy of these strings.
+DEMO_WORKFLOW_NAME = "Car Service Center Demo"
+DEMO_SOURCE_TENANT_SLUG = "voiceorchid"
+
 
 def clone_workflow_to_tenant(
     session: Session, source_workflow_id: UUID, target_tenant_id: UUID

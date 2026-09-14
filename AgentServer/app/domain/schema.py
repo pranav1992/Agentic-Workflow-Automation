@@ -230,6 +230,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    full_name: Optional[str] = None
+    # Registering always creates a brand-new tenant — there's no "join an
+    # existing organization" flow, so this is required and becomes that
+    # tenant's display name (slug is derived from it).
+    tenant_name: str
+
+
 class UserResponse(BaseModel):
     id: UUID
     tenant_id: UUID

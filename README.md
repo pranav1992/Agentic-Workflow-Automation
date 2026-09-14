@@ -193,24 +193,24 @@ Every `WorkFlow`, `Agent`, `Tool`, `Edge`, `PositionNode`, and `NodeConfig` row 
 
 ## Authentication
 
-Every API route except `POST /auth/login` requires a signed-in user — there's no anonymous access to the builder, and (since a later hardening pass) no anonymous access to the voice demo endpoints either.
+Every API route except `POST /auth/login` and `POST /auth/register` requires a signed-in user — there's no anonymous access to the builder, and (since a later hardening pass) no anonymous access to the voice demo endpoints either.
 
-### Signing in
+### Signing in / signing up
 
-1. Open the app — you'll land on `/login` if you don't already have a valid session.
-2. Enter the email/password for an account created via the bootstrap script (see [Automation Scripts](#automation-scripts) — there's no self-registration page on purpose; this is an internal builder tool).
-3. On success, the frontend stores a JWT in `localStorage` and sends it as `Authorization: Bearer <token>` on every request from then on.
+- **New here?** Go to `/register`, name your organization, and create an account — this creates a brand-new tenant with you as its first admin and seeds it with the demo workflow, so you land on something explorable rather than an empty screen. There's no "join an existing organization" flow; every registration is its own tenant.
+- **Already have an account?** `/login` with your email/password.
+- Either way, the frontend stores a JWT in `localStorage` and sends it as `Authorization: Bearer <token>` on every request from then on.
 
 ### What a login gets you
 
 - **Any signed-in user can do everything** — create, edit, and delete workflows/agents/tools regardless of role. There's a `role` field (`admin`, `tenant_admin`, `operator`, `agent`, `service_account`) and an unused RBAC permission model in the code, but nothing currently checks it; this is a deliberate simplification, not a bug, for a single small-team deployment. See [SECURITY.md](SECURITY.md) for the full reasoning and how to bring role checks back if you need them.
 - **Data is scoped to your tenant.** Every workflow/agent/tool you create is tagged with your account's tenant; you'll never see another tenant's data, even by guessing a real ID.
 - **Tokens expire** (`JWT_EXPIRE_MINUTES`, default 30 minutes) and can be **revoked immediately** by signing out — logout invalidates every token issued to that account, not just the one used to log out (there's no per-device session tracking).
-- **Login is rate-limited** two ways at once: a per-IP cap (`LOGIN_RATE_LIMIT_ATTEMPTS` per `LOGIN_RATE_LIMIT_WINDOW_SECONDS`, default 10/5min) and a per-account lockout (`ACCOUNT_LOCKOUT_THRESHOLD` consecutive failures, default 5, locks for `ACCOUNT_LOCKOUT_DURATION_SECONDS`, default 15min) — a locked account rejects even the correct password until the lock expires.
+- **Login and registration are both rate-limited** two ways at once: a per-IP cap (`LOGIN_RATE_LIMIT_ATTEMPTS` per `LOGIN_RATE_LIMIT_WINDOW_SECONDS`, default 10/5min, shared across both endpoints) and, for login specifically, a per-account lockout (`ACCOUNT_LOCKOUT_THRESHOLD` consecutive failures, default 5, locks for `ACCOUNT_LOCKOUT_DURATION_SECONDS`, default 15min) — a locked account rejects even the correct password until the lock expires.
 
-### Creating the first user
+### Creating a user without the sign-up page
 
-There's no sign-up form. Create your first (and any subsequent) user with:
+Registration always creates a brand-new tenant — there's no admin-invites-teammate flow yet. If you need to add another user *into an existing tenant* (or just prefer a script to clicking through a form), use the bootstrap script instead:
 
 ```bash
 cd AgentServer
@@ -218,12 +218,13 @@ python scripts/create_user.py --email you@example.com --password 'a-strong-passw
   --tenant-name "My Company" --tenant-slug my-company --role admin
 ```
 
-This creates the tenant (if it doesn't already exist) and the user in one step. Run it against whichever database your app is currently pointed at (local `.env.local`, or via `docker exec`/`docker compose run` against a deployed container — see [Automation Scripts](#automation-scripts)).
+This creates the tenant (if it doesn't already exist) and the user in one step, also seeding the demo workflow for a brand-new tenant. Run it against whichever database your app is currently pointed at (local `.env.local`, or via `docker exec`/`docker compose run` against a deployed container — see [Automation Scripts](#automation-scripts)).
 
 ### Auth endpoints
 
 | Method | Path | Auth required? | Description |
 |---|---|---|---|
+| POST | `/auth/register` | No | `{email, password, tenant_name, full_name?}` → creates a new tenant + admin user + demo workflow, signs in immediately |
 | POST | `/auth/login` | No | `{email, password}` → `{access_token, user}` |
 | GET | `/auth/me` | Yes | Verifies the current token and returns the signed-in user |
 | POST | `/auth/logout` | Yes | Revokes every token issued to the current user |
@@ -390,7 +391,8 @@ These are plain Python, run with the backend's virtualenv active and pointed at 
 
 | Script | What it does | When you need it |
 |---|---|---|
-| `create_user.py` | Creates a tenant (if it doesn't exist) and a user in one step. | The very first user on a fresh deployment — there's no sign-up page. |
+| `create_user.py` | Creates a tenant (if it doesn't exist) and a user in one step, seeding the demo workflow for a new tenant. | Adding a user without going through `/register` — e.g. into an existing tenant, or before the frontend is even running. |
+| `backfill_demo_workflows.py` | Seeds the demo workflow into any existing tenant that has zero workflows. Never touches a tenant that already has at least one. | Tenants created before demo-seeding existed, or created with `--skip-demo-workflow`. |
 | `backfill_tenant_id.py` | Assigns a tenant to any pre-existing row that predates tenant scoping (`tenant_id IS NULL`). Refuses to run if more than one tenant exists, since it can't know which one owned an orphaned row. | Only relevant if you're running an install that predates multi-tenancy — a fresh install never needs this. |
 
 ```bash

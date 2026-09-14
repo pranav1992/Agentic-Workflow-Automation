@@ -20,10 +20,11 @@ from sqlmodel import Session
 from app.infrastructure.db.engine import engine
 from app.infrastructure.db.auth_models import Tenant
 from app.infrastructure.db.models import WorkFlow
-from app.application.services.workflow_clone_service import clone_workflow_to_tenant
-
-DEMO_WORKFLOW_NAME = "Car Service Center Demo"
-DEMO_SOURCE_TENANT_SLUG = "voiceorchid"
+from app.application.services.workflow_clone_service import (
+    clone_workflow_to_tenant,
+    DEMO_WORKFLOW_NAME,
+    DEMO_SOURCE_TENANT_SLUG,
+)
 
 
 def main() -> None:

@@ -22,16 +22,12 @@ from app.infrastructure.db.engine import engine, create_db_and_tables
 from app.infrastructure.db.auth_models import Tenant
 from app.infrastructure.db.models import WorkFlow
 from app.application.services.auth_service import AuthService
-from app.application.services.workflow_clone_service import clone_workflow_to_tenant
+from app.application.services.workflow_clone_service import (
+    clone_workflow_to_tenant,
+    DEMO_WORKFLOW_NAME,
+    DEMO_SOURCE_TENANT_SLUG,
+)
 from app.core.constants import UserRole
-
-# Every brand-new tenant gets its own copy of this workflow, so a new
-# user never lands on an empty "no workflows yet" screen. Looked up by
-# name within DEMO_SOURCE_TENANT_SLUG — the one tenant that actually
-# owns the canonical copy — not shared across tenants, since tenant data
-# is fully isolated (see app/application/services/workflow_clone_service.py).
-DEMO_WORKFLOW_NAME = "Car Service Center Demo"
-DEMO_SOURCE_TENANT_SLUG = "voiceorchid"
 
 
 def generate_password(length: int = 24) -> str:

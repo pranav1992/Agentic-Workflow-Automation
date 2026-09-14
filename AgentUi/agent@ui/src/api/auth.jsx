@@ -5,6 +5,20 @@ export const login = async (email, password) => {
   return data;
 };
 
+// Always creates a brand-new tenant with this user as its first admin —
+// there's no "join an existing organization" flow. Backend seeds the
+// demo workflow into it and signs the user in immediately, same
+// response shape as login.
+export const register = async (email, password, tenantName, fullName) => {
+  const { data } = await apiClient.post("/auth/register", {
+    email,
+    password,
+    tenant_name: tenantName,
+    full_name: fullName || undefined,
+  });
+  return data;
+};
+
 // Round-trips the stored token through the backend (signature + expiry +
 // user-still-exists) rather than trusting that its mere presence in
 // localStorage means it's still good.

@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.domain.schema import LoginRequest, LoginResponse, UserResponse
+from app.domain.schema import LoginRequest, LoginResponse, RegisterRequest, UserResponse
 from app.application.services.auth_service import AuthService
 from app.api.dependencies.services import get_auth_service
 from app.api.dependencies.auth import get_current_user
@@ -27,6 +27,35 @@ def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
         )
+
+    token = auth_service.create_access_token(
+        user_id=user.id,
+        tenant_id=user.tenant_id,
+        role=UserRole(user.role),
+        token_version=user.token_version,
+    )
+    return LoginResponse(
+        access_token=token,
+        user=UserResponse.model_validate(user),
+    )
+
+
+@router.post("/register", response_model=LoginResponse)
+def register(
+    payload: RegisterRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """Self-registration: always creates a brand-new tenant with this
+    user as its first admin (there's no "join an existing org" flow),
+    seeded with the demo workflow — see AuthService.register_new_tenant.
+    Signs the user in immediately, same response shape as /auth/login.
+    """
+    user, _tenant = auth_service.register_new_tenant(
+        tenant_name=payload.tenant_name,
+        email=payload.email,
+        password=payload.password,
+        full_name=payload.full_name,
+    )
 
     token = auth_service.create_access_token(
         user_id=user.id,
