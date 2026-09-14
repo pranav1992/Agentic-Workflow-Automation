@@ -20,8 +20,18 @@ from sqlmodel import Session
 
 from app.infrastructure.db.engine import engine, create_db_and_tables
 from app.infrastructure.db.auth_models import Tenant
+from app.infrastructure.db.models import WorkFlow
 from app.application.services.auth_service import AuthService
+from app.application.services.workflow_clone_service import clone_workflow_to_tenant
 from app.core.constants import UserRole
+
+# Every brand-new tenant gets its own copy of this workflow, so a new
+# user never lands on an empty "no workflows yet" screen. Looked up by
+# name within DEMO_SOURCE_TENANT_SLUG — the one tenant that actually
+# owns the canonical copy — not shared across tenants, since tenant data
+# is fully isolated (see app/application/services/workflow_clone_service.py).
+DEMO_WORKFLOW_NAME = "Car Service Center Demo"
+DEMO_SOURCE_TENANT_SLUG = "voiceorchid"
 
 
 def generate_password(length: int = 24) -> str:
@@ -46,6 +56,11 @@ def main() -> None:
     parser.add_argument(
         "--role", default="admin", choices=[r.value for r in UserRole]
     )
+    parser.add_argument(
+        "--skip-demo-workflow",
+        action="store_true",
+        help="Don't seed the demo workflow into a newly created tenant.",
+    )
     args = parser.parse_args()
 
     password = args.password or generate_password()
@@ -57,11 +72,32 @@ def main() -> None:
         tenant = session.query(Tenant).filter(
             Tenant.slug == args.tenant_slug
         ).first()
+        is_new_tenant = tenant is None
         if not tenant:
             tenant = Tenant(name=args.tenant_name, slug=args.tenant_slug)
             session.add(tenant)
             session.commit()
             session.refresh(tenant)
+
+        if is_new_tenant and not args.skip_demo_workflow:
+            source_tenant = session.query(Tenant).filter(
+                Tenant.slug == DEMO_SOURCE_TENANT_SLUG
+            ).first()
+            demo_workflow = None
+            if source_tenant:
+                demo_workflow = session.query(WorkFlow).filter(
+                    WorkFlow.tenant_id == source_tenant.id,
+                    WorkFlow.name == DEMO_WORKFLOW_NAME,
+                ).first()
+            if demo_workflow:
+                clone_workflow_to_tenant(session, demo_workflow.id, tenant.id)
+                session.commit()
+                print(f"Seeded demo workflow {DEMO_WORKFLOW_NAME!r} into tenant {tenant.slug}")
+            else:
+                print(
+                    f"Note: demo workflow {DEMO_WORKFLOW_NAME!r} not found in tenant "
+                    f"{DEMO_SOURCE_TENANT_SLUG!r} — skipping seed."
+                )
 
         auth_service = AuthService(session)
         user = auth_service.create_user(

@@ -558,7 +558,6 @@ This setup is intentionally simple, and simple has real limits — it's a good f
 | EC2 `t3.small` (2 vCPU, 2 GiB RAM) | $0.0224/hr | ≈ **$16.35** |
 | EBS `gp3` volume, 30 GB | $0.08/GB-month | ≈ **$2.40** |
 | Elastic IP | $0.005/hr, flat — same rate whether attached, idle, *or* on a stopped instance | ≈ **$3.65** |
-| Data transfer out | ~$0.09/GB after a small free allowance (varies by account age/region) | **Usually negligible** for a low-traffic internal tool — a handful of GB/month at most |
 | LiveKit SFU | **$0** — self-hosted in a container on the same instance, not LiveKit Cloud | — |
 | Domain / TLS | **$0** — `sslip.io` hostnames + Caddy's automatic Let's Encrypt certs | — |
 
